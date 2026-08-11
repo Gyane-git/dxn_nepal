@@ -109,13 +109,15 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  addresses          Address[]
-  cart               Cart?
-  wishlist           Wishlist?
-  orders             Order[]
-  reviews            Review[]
-  notifications      Notification[]
+  addresses           Address[]
+  cart                Cart?
+  wishlist            Wishlist?
+  orders              Order[]
+  reviews             Review[]
+  notifications       Notification[]
   passwordResetTokens PasswordResetToken[]
+
+  @@map("user")
 }
 
 model Address {
@@ -144,6 +146,7 @@ model Address {
   @@index([provinceId])
   @@index([districtId])
   @@index([municipalityId])
+  @@map("address")
 }
 
 model AddressBook {
@@ -159,13 +162,14 @@ model AddressBook {
   parent   AddressBook?  @relation("AddressBookToAddressBook", fields: [parentId], references: [id], onDelete: Cascade)
   children AddressBook[] @relation("AddressBookToAddressBook")
 
-  addressesAsProvince     Address[] @relation("AddressProvince")
-  addressesAsDistrict     Address[] @relation("AddressDistrict")
-  addressesAsMunicipality Address[] @relation("AddressMunicipality")
+  addressesAsProvince      Address[]                 @relation("AddressProvince")
+  addressesAsDistrict      Address[]                 @relation("AddressDistrict")
+  addressesAsMunicipality  Address[]                 @relation("AddressMunicipality")
   municipalityShippingRate MunicipalityShippingRate?
 
   @@index([parentId])
   @@index([level])
+  @@map("addressbook")
 }
 
 model Category {
@@ -194,6 +198,7 @@ model Category {
   @@index([parentCategoryId])
   @@index([status])
   @@index([deletedAt])
+  @@map("category")
 }
 
 model Brand {
@@ -218,12 +223,13 @@ model Brand {
 
   @@index([status])
   @@index([deletedAt])
+  @@map("brand")
 }
 
 model Product {
-  id         Int    @id @default(autoincrement())
+  id         Int     @id @default(autoincrement())
   name       String
-  slug       String @unique
+  slug       String  @unique
   sku        String? @unique
   categoryId Int
   brandId    Int?
@@ -289,18 +295,20 @@ model Product {
   @@index([brandId])
   @@index([status])
   @@index([deletedAt])
+  @@map("product")
 }
 
 model ProductImage {
-  id        Int    @id @default(autoincrement())
+  id        Int     @id @default(autoincrement())
   productId Int
   url       String?
   alt       String
-  sortOrder Int    @default(0)
+  sortOrder Int     @default(0)
 
   product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([productId])
+  @@map("productimage")
 }
 
 model ProductRelation {
@@ -317,6 +325,7 @@ model ProductRelation {
   @@unique([productId, relatedId, type])
   @@index([productId])
   @@index([relatedId])
+  @@map("productrelation")
 }
 
 model Attribute {
@@ -329,6 +338,8 @@ model Attribute {
   updatedAt DateTime      @updatedAt
 
   values AttributeValue[]
+
+  @@map("attribute")
 }
 
 model AttributeValue {
@@ -345,6 +356,7 @@ model AttributeValue {
 
   @@unique([attributeId, value])
   @@index([attributeId])
+  @@map("attributevalue")
 }
 
 model ProductVariant {
@@ -371,6 +383,7 @@ model ProductVariant {
   @@index([productId])
   @@index([status])
   @@index([deletedAt])
+  @@map("productvariant")
 }
 
 model ProductVariantValue {
@@ -384,6 +397,7 @@ model ProductVariantValue {
   @@unique([variantId, attributeValueId])
   @@index([variantId])
   @@index([attributeValueId])
+  @@map("productvariantvalue")
 }
 
 model Cart {
@@ -394,6 +408,8 @@ model Cart {
 
   user  User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   items CartItem[]
+
+  @@map("cart")
 }
 
 model CartItem {
@@ -409,6 +425,7 @@ model CartItem {
 
   @@index([productId])
   @@index([variantId])
+  @@map("cartitem")
 }
 
 model Wishlist {
@@ -419,6 +436,8 @@ model Wishlist {
 
   user  User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   items WishlistItem[]
+
+  @@map("wishlist")
 }
 
 model WishlistItem {
@@ -435,6 +454,7 @@ model WishlistItem {
   @@unique([wishlistId, productId, variantId])
   @@index([productId])
   @@index([variantId])
+  @@map("wishlistitem")
 }
 
 model ShippingZone {
@@ -448,6 +468,7 @@ model ShippingZone {
   updatedAt            DateTime @updatedAt
 
   @@index([isDefault])
+  @@map("shippingzone")
 }
 
 model MunicipalityShippingRate {
@@ -460,6 +481,8 @@ model MunicipalityShippingRate {
   updatedAt            DateTime @updatedAt
 
   municipality AddressBook @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+
+  @@map("municipalityshippingrate")
 }
 
 model TaxRate {
@@ -470,6 +493,8 @@ model TaxRate {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+
+  @@map("taxrate")
 }
 
 model Coupon {
@@ -483,6 +508,8 @@ model Coupon {
   createdAt      DateTime   @default(now())
 
   orders Order[]
+
+  @@map("coupon")
 }
 
 model Order {
@@ -533,6 +560,7 @@ model Order {
 
   @@index([userId])
   @@index([status])
+  @@map("order")
 }
 
 model OrderItem {
@@ -551,6 +579,7 @@ model OrderItem {
 
   @@index([orderId])
   @@index([productId])
+  @@map("orderitem")
 }
 
 model OrderStatusHistory {
@@ -563,6 +592,7 @@ model OrderStatusHistory {
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@map("orderstatushistory")
 }
 
 model Review {
@@ -583,6 +613,7 @@ model Review {
   @@index([productId])
   @@index([userId])
   @@index([status])
+  @@map("review")
 }
 
 model HomeBannerSlide {
@@ -598,6 +629,7 @@ model HomeBannerSlide {
   updatedAt  DateTime @updatedAt
 
   @@index([active])
+  @@map("homebannerslide")
 }
 
 model PasswordResetToken {
@@ -610,6 +642,7 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@map("passwordresettoken")
 }
 
 model EmailSettings {
@@ -623,6 +656,8 @@ model EmailSettings {
   fromName     String   @default("DXN")
   fromEmail    String?
   updatedAt    DateTime @updatedAt
+
+  @@map("emailsettings")
 }
 
 model PaymentSettings {
@@ -637,6 +672,8 @@ model PaymentSettings {
   esewaPaymentUrl   String?
   esewaStatusUrl    String?
   updatedAt         DateTime @updatedAt
+
+  @@map("paymentsettings")
 }
 
 model InvoiceSettings {
@@ -651,6 +688,8 @@ model InvoiceSettings {
   logo          String?
   invoicePrefix String   @default("INV-")
   updatedAt     DateTime @updatedAt
+
+  @@map("invoicesettings")
 }
 
 model Notification {
@@ -663,4 +702,5 @@ model Notification {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+  @@map("notification")
 }
