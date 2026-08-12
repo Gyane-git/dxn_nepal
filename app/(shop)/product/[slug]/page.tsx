@@ -20,7 +20,10 @@ function initials(name: string) {
     .toUpperCase();
 }
 
-export default async function ProductPage({ params, searchParams }: ProductPageProps) {
+export default async function ProductPage({
+  params,
+  searchParams,
+}: ProductPageProps) {
   const { slug } = await params;
   const { color: colorSlug } = await searchParams;
 
@@ -36,7 +39,11 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
       },
       variants: {
         where: { status: "ACTIVE", deletedAt: null },
-        include: { attributeValues: { include: { attributeValue: { include: { attribute: true } } } } },
+        include: {
+          attributeValues: {
+            include: { attributeValue: { include: { attribute: true } } },
+          },
+        },
         orderBy: { id: "asc" },
       },
     },
@@ -45,7 +52,8 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
   if (!product) notFound();
 
   const avgRating = product.reviews.length
-    ? product.reviews.reduce((sum, r) => sum + r.rating, 0) / product.reviews.length
+    ? product.reviews.reduce((sum, r) => sum + r.rating, 0) /
+      product.reviews.length
     : 0;
 
   const groupMap = new Map<
@@ -55,14 +63,29 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
       name: string;
       type: "TEXT" | "COLOR";
       sortOrder: number;
-      values: Map<number, { id: number; value: string; slug: string; colorHex: string | null; sortOrder: number }>;
+      values: Map<
+        number,
+        {
+          id: number;
+          value: string;
+          slug: string;
+          colorHex: string | null;
+          sortOrder: number;
+        }
+      >;
     }
   >();
   for (const variant of product.variants) {
     for (const av of variant.attributeValues) {
       const attr = av.attributeValue.attribute;
       if (!groupMap.has(attr.id)) {
-        groupMap.set(attr.id, { id: attr.id, name: attr.name, type: attr.type, sortOrder: attr.sortOrder, values: new Map() });
+        groupMap.set(attr.id, {
+          id: attr.id,
+          name: attr.name,
+          type: attr.type,
+          sortOrder: attr.sortOrder,
+          values: new Map(),
+        });
       }
       const group = groupMap.get(attr.id)!;
       if (!group.values.has(av.attributeValue.id)) {
@@ -82,7 +105,9 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
       id: g.id,
       name: g.name,
       type: g.type,
-      values: Array.from(g.values.values()).sort((a, b) => a.sortOrder - b.sortOrder),
+      values: Array.from(g.values.values()).sort(
+        (a, b) => a.sortOrder - b.sortOrder,
+      ),
     }));
 
   const initialSelected: Record<number, number> = {};
@@ -107,9 +132,14 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
   return (
     <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
       <nav className="mb-6 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-        <Link href="/shop" className="hover:text-primary-600">Shop</Link>
+        <Link href="/shop" className="hover:text-primary-600">
+          Shop
+        </Link>
         <span className="text-gray-300">/</span>
-        <Link href={`/shop?category=${product.category.slug}`} className="hover:text-primary-600">
+        <Link
+          href={`/shop?category=${product.category.slug}`}
+          className="hover:text-primary-600"
+        >
           {product.category.name}
         </Link>
         <span className="text-gray-300">/</span>
@@ -128,10 +158,14 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
           <span className="inline-block rounded-full bg-accent-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-accent-700">
             {product.category.name}
           </span>
-          <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-900">{product.name}</h1>
+          <h1 className="mt-3 text-3xl font-bold tracking-tight text-gray-900">
+            {product.name}
+          </h1>
 
           <div className="mt-2 flex items-center gap-3">
-            {product.reviews.length > 0 && <StarRating rating={avgRating} count={product.reviews.length} />}
+            {product.reviews.length > 0 && (
+              <StarRating rating={avgRating} count={product.reviews.length} />
+            )}
           </div>
 
           <div
@@ -143,7 +177,9 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
             <ProductPurchasePanel
               productId={product.id}
               basePrice={Number(product.price)}
-              baseCompareAtPrice={product.compareAtPrice ? Number(product.compareAtPrice) : null}
+              baseCompareAtPrice={
+                product.compareAtPrice ? Number(product.compareAtPrice) : null
+              }
               baseStock={product.stock}
               variantGroups={variantGroups}
               variants={variantOptions}
@@ -155,22 +191,32 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
 
       <section className="mt-16 border-t border-gray-100 pt-10">
         <h2 className="text-xl font-bold tracking-tight text-gray-900">
-          Customer Reviews {product.reviews.length > 0 && `(${product.reviews.length})`}
+          Customer Reviews{" "}
+          {product.reviews.length > 0 && `(${product.reviews.length})`}
         </h2>
 
         {product.reviews.length === 0 ? (
-          <p className="mt-3 text-sm text-gray-500">No reviews yet for this product.</p>
+          <p className="mt-3 text-sm text-gray-500">
+            No reviews yet for this product.
+          </p>
         ) : (
           <div className="mt-5 space-y-4">
             {product.reviews.map((review) => (
-              <div key={review.id} className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft">
+              <div
+                key={review.id}
+                className="flex gap-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft"
+              >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-sm font-semibold text-primary-700">
                   {initials(review.user.name)}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-semibold text-gray-800">{review.user.name}</span>
-                    <span className="text-xs text-gray-400">{formatDate(review.createdAt)}</span>
+                    <span className="text-sm font-semibold text-gray-800">
+                      {review.user.name}
+                    </span>
+                    <span className="text-xs text-gray-400">
+                      {formatDate(review.createdAt)}
+                    </span>
                   </div>
                   <div className="mt-1">
                     <StarRating rating={review.rating} />
@@ -183,7 +229,10 @@ export default async function ProductPage({ params, searchParams }: ProductPageP
         )}
         <p className="mt-4 text-xs text-gray-400">
           Purchased this item? You can leave a review from a delivered order in{" "}
-          <Link href="/account/orders" className="text-primary-600 hover:underline">
+          <Link
+            href="/account/orders"
+            className="text-primary-600 hover:underline"
+          >
             My Orders
           </Link>
           .

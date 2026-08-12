@@ -53,7 +53,9 @@ export function ProductPurchasePanel({
   const { status } = useSession();
   const router = useRouter();
   const pathname = usePathname();
-  const [selected, setSelected] = useState<Record<number, number>>(initialSelected ?? {});
+  const [selected, setSelected] = useState<Record<number, number>>(
+    initialSelected ?? {},
+  );
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
   const [isBuyingNow, setIsBuyingNow] = useState(false);
@@ -62,13 +64,16 @@ export function ProductPurchasePanel({
 
   const hasVariants = variantGroups.length > 0;
   const selectedIds = useMemo(() => Object.values(selected), [selected]);
-  const isComplete = hasVariants && variantGroups.every((g) => selected[g.id] !== undefined);
+  const isComplete =
+    hasVariants && variantGroups.every((g) => selected[g.id] !== undefined);
 
   const matchedVariant = useMemo(() => {
     if (!isComplete) return null;
     return (
       variants.find(
-        (v) => v.attributeValueIds.length === selectedIds.length && selectedIds.every((id) => v.attributeValueIds.includes(id))
+        (v) =>
+          v.attributeValueIds.length === selectedIds.length &&
+          selectedIds.every((id) => v.attributeValueIds.includes(id)),
       ) ?? null
     );
   }, [isComplete, selectedIds, variants]);
@@ -77,24 +82,34 @@ export function ProductPurchasePanel({
   function isValueAvailable(groupId: number, valueId: number) {
     const trialSelection = { ...selected, [groupId]: valueId };
     const trialIds = Object.values(trialSelection);
-    return variants.some((v) => trialIds.every((id) => v.attributeValueIds.includes(id)));
+    return variants.some((v) =>
+      trialIds.every((id) => v.attributeValueIds.includes(id)),
+    );
   }
 
   function selectValue(groupId: number, valueId: number) {
     setError(null);
     setAdded(false);
-    setSelected((prev) => (prev[groupId] === valueId ? prev : { ...prev, [groupId]: valueId }));
+    setSelected((prev) =>
+      prev[groupId] === valueId ? prev : { ...prev, [groupId]: valueId },
+    );
   }
 
   const effectivePrice = matchedVariant?.price ?? basePrice;
-  const effectiveCompareAtPrice = matchedVariant ? matchedVariant.compareAtPrice : baseCompareAtPrice;
+  const effectiveCompareAtPrice = matchedVariant
+    ? matchedVariant.compareAtPrice
+    : baseCompareAtPrice;
   const effectiveStock = hasVariants ? (matchedVariant?.stock ?? 0) : baseStock;
-  const onSale = effectiveCompareAtPrice !== null && effectiveCompareAtPrice > effectivePrice;
+  const onSale =
+    effectiveCompareAtPrice !== null &&
+    effectiveCompareAtPrice > effectivePrice;
   const outOfStock = effectiveStock <= 0;
 
   async function handleAction(after: () => void) {
     if (hasVariants && !isComplete) {
-      setError(`Please select ${variantGroups.map((g) => g.name).join(" and ")}`);
+      setError(
+        `Please select ${variantGroups.map((g) => g.name).join(" and ")}`,
+      );
       return false;
     }
     if (hasVariants && !matchedVariant) {
@@ -106,7 +121,10 @@ export function ProductPurchasePanel({
       after();
       return true;
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Could not add this item to your cart";
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Could not add this item to your cart";
       setError(message);
       showToast(message, "error");
       return false;
@@ -146,8 +164,14 @@ export function ProductPurchasePanel({
   return (
     <div>
       <div className="flex items-baseline gap-3">
-        <span className="text-3xl font-bold text-primary-700">{formatPrice(effectivePrice)}</span>
-        {onSale && <span className="text-lg text-gray-400 line-through">{formatPrice(effectiveCompareAtPrice!)}</span>}
+        <span className="text-3xl font-bold text-primary-700">
+          {formatPrice(effectivePrice)}
+        </span>
+        {onSale && (
+          <span className="text-lg text-gray-400 line-through">
+            {formatPrice(effectiveCompareAtPrice!)}
+          </span>
+        )}
       </div>
 
       {hasVariants && (
@@ -158,7 +182,11 @@ export function ProductPurchasePanel({
                 {group.name}
                 {selected[group.id] !== undefined && (
                   <span className="ml-1.5 font-normal normal-case text-gray-400">
-                    — {group.values.find((v) => v.id === selected[group.id])?.value}
+                    —{" "}
+                    {
+                      group.values.find((v) => v.id === selected[group.id])
+                        ?.value
+                    }
                   </span>
                 )}
               </p>
@@ -177,7 +205,9 @@ export function ProductPurchasePanel({
                           aria-label={v.value}
                           aria-current={isSelected}
                           className={`flex h-9 w-9 items-center justify-center rounded-full ring-2 ring-offset-2 transition-shadow disabled:cursor-not-allowed disabled:opacity-30 ${
-                            isSelected ? "ring-primary-500" : "ring-transparent hover:ring-gray-200"
+                            isSelected
+                              ? "ring-primary-500"
+                              : "ring-transparent hover:ring-gray-200"
                           }`}
                         >
                           <span
@@ -225,7 +255,9 @@ export function ProductPurchasePanel({
               >
                 −
               </button>
-              <span className="w-10 text-center text-sm font-medium">{quantity}</span>
+              <span className="w-10 text-center text-sm font-medium">
+                {quantity}
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -233,7 +265,9 @@ export function ProductPurchasePanel({
                     showToast(`Only ${effectiveStock} in stock`, "error");
                     return;
                   }
-                  setQuantity((q) => Math.min(Math.max(effectiveStock, 1), q + 1));
+                  setQuantity((q) =>
+                    Math.min(Math.max(effectiveStock, 1), q + 1),
+                  );
                 }}
                 className="px-3.5 py-2 text-gray-600 transition-colors hover:bg-gray-50"
                 aria-label="Increase quantity"
@@ -243,10 +277,16 @@ export function ProductPurchasePanel({
             </div>
             <span
               className={`rounded-full px-3 py-1 text-xs font-medium ${
-                outOfStock ? "bg-red-50 text-red-600" : "bg-accent-50 text-accent-700"
+                outOfStock
+                  ? "bg-red-50 text-red-600"
+                  : "bg-accent-50 text-accent-700"
               }`}
             >
-              {hasVariants && !isComplete ? "Select options" : outOfStock ? "Out of stock" : `${effectiveStock} in stock`}
+              {hasVariants && !isComplete
+                ? "Select options"
+                : outOfStock
+                  ? "Out of stock"
+                  : `${effectiveStock} in stock`}
             </span>
           </div>
 
@@ -254,7 +294,7 @@ export function ProductPurchasePanel({
             <Button
               variant="outline"
               size="lg"
-              className="flex-1"
+              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
               disabled={outOfStock && isComplete}
               isLoading={isAdding}
               onClick={handleAdd}
@@ -264,7 +304,7 @@ export function ProductPurchasePanel({
             <Button
               variant="primary"
               size="lg"
-              className="flex-1"
+              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
               disabled={outOfStock && isComplete}
               isLoading={isBuyingNow}
               onClick={handleBuyNow}

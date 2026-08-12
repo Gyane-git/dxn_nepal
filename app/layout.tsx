@@ -33,7 +33,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <body className="min-h-full">
         <SessionProvider>
-          <NavigationProgress />
+          {/* <NavigationProgress /> */}
           <ToastProvider>{children}</ToastProvider>
         </SessionProvider>
       </body>

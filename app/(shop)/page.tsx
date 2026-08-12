@@ -236,34 +236,6 @@ export default async function HomePage() {
         </section>
       )}
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section className="mt-6 border-b border-gray-100 bg-white">
-          <div className="grid grid-cols-1 gap-6 py-8 text-center sm:grid-cols-3">
-            {TRUST_ITEMS.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-center gap-3"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.6}
-                  >
-                    {item.icon}
-                  </svg>
-                </span>
-                <span className="text-sm font-medium text-gray-700">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-
       <CategoryBrandGrid
         title="Categories"
         items={categories}
@@ -328,6 +300,34 @@ export default async function HomePage() {
           { title: "Trending Now", products: trendingProducts },
         ]}
       />
+
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className="mt-6 border-b border-gray-100 bg-white">
+          <div className="grid grid-cols-1 gap-6 py-8 text-center sm:grid-cols-3">
+            {TRUST_ITEMS.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-start md:justify-center gap-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.6}
+                  >
+                    {item.icon}
+                  </svg>
+                </span>
+                <span className="text-sm font-medium text-gray-700">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
     </div>
   );
 }

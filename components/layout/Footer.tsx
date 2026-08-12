@@ -6,8 +6,8 @@ import { ArrowUp } from "lucide-react";
 
 export function Footer() {
   return (
-    <footer className="mt-auto border-t border-gray-200 bg-white text-gray-500">
-      <div className="mx-auto grid max-w-7xl grid-cols-1 gap-8 px-4 py-10 sm:px-6 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+    <footer className="mt-auto border-t border-gray-200 bg-white text-gray-500 ps-5">
+      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 grid-cols-2 sm:px-6 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
           <Logo />
           <p className="mt-3 text-sm text-gray-500">
