@@ -290,32 +290,34 @@ export function ProductPurchasePanel({
             </span>
           </div>
 
-          <div className="flex gap-3">
+          <div className="flex gap-2 sm:gap-3 items-center">
             <Button
               variant="outline"
               size="lg"
-              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
+              className="flex-1 px-1 py-1 text-xs sm:px-4 sm:py-3 sm:text-base whitespace-nowrap"
               disabled={outOfStock && isComplete}
               isLoading={isAdding}
               onClick={handleAdd}
             >
               {added ? "Added ✓" : "Add to Cart"}
             </Button>
+
             <Button
               variant="primary"
               size="lg"
-              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
+              className="flex-1 px-2 py-1.5 text-xs sm:px-4 sm:py-3 sm:text-base"
               disabled={outOfStock && isComplete}
               isLoading={isBuyingNow}
               onClick={handleBuyNow}
             >
               Buy Now
             </Button>
+
             <WishlistButton
               productId={productId}
               variantId={matchedVariant?.id ?? null}
               size="lg"
-              className="border border-gray-200 shadow-none"
+              className="border border-gray-200 shadow-none text"
             />
           </div>
 
