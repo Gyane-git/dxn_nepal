@@ -1,5 +1,8 @@
+"use client";
+
 import Link from "next/link";
 import { Logo } from "@/components/layout/Logo";
+import { ArrowUp } from "lucide-react";
 
 export function Footer() {
   return (
@@ -62,11 +65,21 @@ export function Footer() {
           <p className="text-sm text-gray-500">Sales Counter: +603-60339834</p>
         </div>
       </div>
-      <div className="border-t border-gray-100 px-4 py-4 text-center text-xs text-gray-400">
+      <div className="relative border-t border-gray-100 px-4 py-4 text-center text-xs text-gray-400">
         <p>&copy; {new Date().getFullYear()} DXN. All rights reserved.</p>
+
         <p className="mt-1">
           Cash on Delivery &amp; secure online checkout available.
         </p>
+
+        <button
+          type="button"
+          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+          aria-label="Back to top"
+          className="absolute right-35 top-1/2 -translate-y-1/2 cursor-pointer transition-colors hover:text-primary-600"
+        >
+          <ArrowUp className="h-6 w-6" strokeWidth={2} />
+        </button>
       </div>
     </footer>
   );

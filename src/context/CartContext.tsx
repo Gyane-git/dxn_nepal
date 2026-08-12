@@ -170,8 +170,12 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         ? guestLines.map((l) => (sameLine(l, productId, variantId) ? { ...l, quantity: l.quantity + quantity } : l))
         : [...guestLines, { productId, variantId, quantity }];
       const hydrated = await hydrateGuestLines(nextGuestLines);
-      if (!hydrated.some((l) => sameLine(l, productId, variantId))) {
+      const hydratedLine = hydrated.find((l) => sameLine(l, productId, variantId));
+      if (!hydratedLine) {
         throw new Error("This product is no longer available");
+      }
+      if (hydratedLine.quantity > hydratedLine.stock) {
+        throw new Error(`Only ${hydratedLine.stock} left in stock`);
       }
       writeGuestCart(nextGuestLines);
       setLines(hydrated);
@@ -218,8 +222,13 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       }
 
       const guestLines = readGuestCart().map((l) => (sameLine(l, productId, variantId) ? { ...l, quantity } : l));
+      const hydrated = await hydrateGuestLines(guestLines);
+      const hydratedLine = hydrated.find((l) => sameLine(l, productId, variantId));
+      if (hydratedLine && hydratedLine.quantity > hydratedLine.stock) {
+        throw new Error(`Only ${hydratedLine.stock} left in stock`);
+      }
       writeGuestCart(guestLines);
-      setLines(await hydrateGuestLines(guestLines));
+      setLines(hydrated);
     },
     [status, removeItem]
   );

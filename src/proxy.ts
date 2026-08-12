@@ -6,6 +6,14 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET });
 
+  if (pathname === "/login" || pathname === "/register") {
+    if (token) {
+      const dashboardUrl = token.role === "ADMIN" ? "/admin" : "/account";
+      return NextResponse.redirect(new URL(dashboardUrl, request.url));
+    }
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/admin")) {
     if (!token) {
       const loginUrl = new URL("/login", request.url);
@@ -29,5 +37,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*"],
+  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*", "/login", "/register"],
 };

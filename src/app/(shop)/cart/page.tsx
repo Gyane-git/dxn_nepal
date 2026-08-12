@@ -6,9 +6,19 @@ import { useCart } from "@/context/CartContext";
 import { ProductImage } from "@/components/product/ProductImage";
 import { Button } from "@/components/ui/Button";
 import { formatPrice } from "@/lib/format";
+import { useToast } from "@/context/ToastContext";
 
 export default function CartPage() {
   const { lines, isLoading, subtotal, updateQuantity, removeItem } = useCart();
+  const showToast = useToast();
+
+  async function handleQuantityChange(productId: string, quantity: number, variantId: number | null) {
+    try {
+      await updateQuantity(productId, quantity, variantId);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Could not update quantity", "error");
+    }
+  }
 
   if (isLoading) {
     return <div className="mx-auto max-w-5xl px-4 py-16 text-center text-gray-500">Loading your cart…</div>;
@@ -58,7 +68,7 @@ export default function CartPage() {
               <div className="flex items-center justify-between gap-3 sm:shrink-0">
                 <div className="flex items-center rounded-full border border-gray-200">
                   <button
-                    onClick={() => updateQuantity(line.productId, line.quantity - 1, line.variantId)}
+                    onClick={() => handleQuantityChange(line.productId, line.quantity - 1, line.variantId)}
                     className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
                     aria-label="Decrease quantity"
                   >
@@ -66,7 +76,13 @@ export default function CartPage() {
                   </button>
                   <span className="w-8 text-center text-sm">{line.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(line.productId, Math.min(line.stock, line.quantity + 1), line.variantId)}
+                    onClick={() => {
+                      if (line.quantity >= line.stock) {
+                        showToast(`Only ${line.stock} in stock`, "error");
+                        return;
+                      }
+                      handleQuantityChange(line.productId, line.quantity + 1, line.variantId);
+                    }}
                     className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
                     aria-label="Increase quantity"
                   >

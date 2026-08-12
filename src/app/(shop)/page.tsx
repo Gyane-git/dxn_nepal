@@ -59,7 +59,9 @@ function mapProductCard(p: {
   category: { name: string; slug: string } | null;
   reviews: { rating: number }[];
 }) {
-  const avgRating = p.reviews.length ? p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length : 0;
+  const avgRating = p.reviews.length
+    ? p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length
+    : 0;
   return {
     id: p.id,
     name: p.name,
@@ -212,8 +214,8 @@ export default async function HomePage() {
                 Live Well with <span className="text-secondary-300">DXN</span>
               </h1>
               <p className="mx-auto mt-5 max-w-md text-lg text-primary-50 lg:mx-0">
-                Ganoderma-infused coffee, spirulina supplements, and personal care —
-                delivered to your door with Cash on Delivery available.
+                Ganoderma-infused coffee, spirulina supplements, and personal
+                care — delivered to your door with Cash on Delivery available.
               </p>
               <div className="mt-8 flex justify-center gap-3 lg:justify-start">
                 <Link
@@ -238,43 +240,75 @@ export default async function HomePage() {
         <section className="mt-6 border-b border-gray-100 bg-white">
           <div className="grid grid-cols-1 gap-6 py-8 text-center sm:grid-cols-3">
             {TRUST_ITEMS.map((item) => (
-              <div key={item.label} className="flex items-center justify-center gap-3">
+              <div
+                key={item.label}
+                className="flex items-center justify-center gap-3"
+              >
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.6}>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.6}
+                  >
                     {item.icon}
                   </svg>
                 </span>
-                <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                <span className="text-sm font-medium text-gray-700">
+                  {item.label}
+                </span>
               </div>
             ))}
           </div>
         </section>
       </div>
 
-      <CategoryBrandGrid title="Categories" items={categories} hrefFor={(slug) => `/shop?category=${slug}`} />
+      <CategoryBrandGrid
+        title="Categories"
+        items={categories}
+        hrefFor={(slug) => `/shop?category=${slug}`}
+      />
 
       <CategoryBrandGrid
         title="Brands"
-        items={brands.map((b) => ({ id: b.id, name: b.name, slug: b.slug, image: b.logo }))}
+        items={brands.map((b) => ({
+          id: b.id,
+          name: b.name,
+          slug: b.slug,
+          image: b.logo,
+        }))}
         hrefFor={(slug) => `/shop?brand=${slug}`}
       />
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-2xl font-bold tracking-tight text-gray-900">Featured Products</h2>
+          <h2 className="text-2xl font-bold tracking-tight text-gray-900">
+            Featured Products
+          </h2>
           <Link
             href="/shop"
             className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-200"
           >
             View all
-            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2}>
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
           </Link>
         </div>
         <div className="mt-6 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {products.map((product) => (
-            <ProductCard key={product.id} product={product} className="border border-gray-200" />
+            <ProductCard
+              key={product.id}
+              product={product}
+              className="border border-gray-200"
+            />
           ))}
         </div>
       </section>

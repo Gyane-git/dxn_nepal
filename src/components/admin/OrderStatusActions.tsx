@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { useToast } from "@/context/ToastContext";
 
 export function OrderStatusActions({
   orderId,
@@ -15,13 +16,14 @@ export function OrderStatusActions({
   returnRequested: boolean;
   onUpdated: () => void;
 }) {
+  const showToast = useToast();
   const [showShipForm, setShowShipForm] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState("");
   const [courierName, setCourierName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function patchStatus(body: Record<string, unknown>) {
+  async function patchStatus(body: Record<string, unknown>, successMessage: string) {
     setIsSubmitting(true);
     setError(null);
     const res = await fetch(`/api/admin/orders/${orderId}/status`, {
@@ -32,9 +34,12 @@ export function OrderStatusActions({
     const json = await res.json();
     setIsSubmitting(false);
     if (!res.ok) {
-      setError(json.message ?? "Update failed");
+      const message = json.message ?? "Update failed";
+      setError(message);
+      showToast(message, "error");
       return;
     }
+    showToast(successMessage, "success");
     onUpdated();
   }
 
@@ -49,15 +54,18 @@ export function OrderStatusActions({
     const json = await res.json();
     setIsSubmitting(false);
     if (!res.ok) {
-      setError(json.message ?? "Update failed");
+      const message = json.message ?? "Update failed";
+      setError(message);
+      showToast(message, "error");
       return;
     }
+    showToast(action === "approve" ? "Return approved" : "Return rejected", "success");
     onUpdated();
   }
 
   async function handleShipSubmit(e: React.FormEvent) {
     e.preventDefault();
-    await patchStatus({ status: "SHIPPED", trackingNumber, courierName });
+    await patchStatus({ status: "SHIPPED", trackingNumber, courierName }, "Order marked as shipped");
     setShowShipForm(false);
   }
 
@@ -91,7 +99,7 @@ export function OrderStatusActions({
             isLoading={isSubmitting}
             onClick={() => {
               const note = prompt("Reason for cancelling (optional):") ?? undefined;
-              patchStatus({ status: "CANCELLED", note });
+              patchStatus({ status: "CANCELLED", note }, "Order cancelled");
             }}
           >
             Cancel Order
@@ -100,7 +108,7 @@ export function OrderStatusActions({
       )}
 
       {status === "SHIPPED" && (
-        <Button variant="admin" size="sm" isLoading={isSubmitting} onClick={() => patchStatus({ status: "DELIVERED" })}>
+        <Button variant="admin" size="sm" isLoading={isSubmitting} onClick={() => patchStatus({ status: "DELIVERED" }, "Order marked as delivered")}>
           Mark as Delivered
         </Button>
       )}

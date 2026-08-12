@@ -1,11 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useCart } from "@/context/CartContext";
 import { Button } from "@/components/ui/Button";
 import { WishlistButton } from "@/components/product/WishlistButton";
 import { formatPrice } from "@/lib/format";
+import { useToast } from "@/context/ToastContext";
 
 interface AttributeValueOption {
   id: number;
@@ -47,7 +49,10 @@ export function ProductPurchasePanel({
   initialSelected?: Record<number, number>;
 }) {
   const { addItem } = useCart();
+  const showToast = useToast();
+  const { status } = useSession();
   const router = useRouter();
+  const pathname = usePathname();
   const [selected, setSelected] = useState<Record<number, number>>(initialSelected ?? {});
   const [quantity, setQuantity] = useState(1);
   const [isAdding, setIsAdding] = useState(false);
@@ -101,12 +106,22 @@ export function ProductPurchasePanel({
       after();
       return true;
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add this item to your cart");
+      const message = err instanceof Error ? err.message : "Could not add this item to your cart";
+      setError(message);
+      showToast(message, "error");
       return false;
     }
   }
 
+  function redirectToLogin() {
+    router.push(`/login?callbackUrl=${encodeURIComponent(pathname ?? "/")}`);
+  }
+
   async function handleAdd() {
+    if (status !== "authenticated") {
+      redirectToLogin();
+      return;
+    }
     setIsAdding(true);
     setError(null);
     const ok = await handleAction(() => {
@@ -118,6 +133,10 @@ export function ProductPurchasePanel({
   }
 
   async function handleBuyNow() {
+    if (status !== "authenticated") {
+      redirectToLogin();
+      return;
+    }
     setIsBuyingNow(true);
     setError(null);
     const ok = await handleAction(() => router.push("/cart"));
@@ -209,7 +228,13 @@ export function ProductPurchasePanel({
               <span className="w-10 text-center text-sm font-medium">{quantity}</span>
               <button
                 type="button"
-                onClick={() => setQuantity((q) => Math.min(Math.max(effectiveStock, 1), q + 1))}
+                onClick={() => {
+                  if (quantity >= effectiveStock) {
+                    showToast(`Only ${effectiveStock} in stock`, "error");
+                    return;
+                  }
+                  setQuantity((q) => Math.min(Math.max(effectiveStock, 1), q + 1));
+                }}
                 className="px-3.5 py-2 text-gray-600 transition-colors hover:bg-gray-50"
                 aria-label="Increase quantity"
               >

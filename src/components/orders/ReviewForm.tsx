@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { StarRatingInput } from "@/components/ui/StarRatingInput";
 import { Button } from "@/components/ui/Button";
+import { useToast } from "@/context/ToastContext";
 
 export function ReviewForm({
   orderItemId,
@@ -11,6 +12,7 @@ export function ReviewForm({
   orderItemId: string;
   onSubmitted: () => void;
 }) {
+  const showToast = useToast();
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,9 +36,12 @@ export function ReviewForm({
     setIsSubmitting(false);
 
     if (!res.ok) {
-      setError(json.message ?? "Could not submit review");
+      const message = json.message ?? "Could not submit review";
+      setError(message);
+      showToast(message, "error");
       return;
     }
+    showToast("Review submitted", "success");
     onSubmitted();
   }
 

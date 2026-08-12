@@ -95,17 +95,18 @@ export async function POST(request: Request) {
       if (!variant) return fail(404, "This variant is no longer available");
       availableStock = variant.stockQuantity;
     }
-    if (quantity > availableStock) return fail(400, `Only ${availableStock} left in stock`);
-
     const cart = await getOrCreateCart(user.id);
     const existing = await prisma.cartItem.findFirst({
       where: { cartId: cart.id, productId, variantId },
     });
 
+    const totalQuantity = (existing?.quantity ?? 0) + quantity;
+    if (totalQuantity > availableStock) return fail(400, `Only ${availableStock} left in stock`);
+
     if (existing) {
       await prisma.cartItem.update({
         where: { id: existing.id },
-        data: { quantity: existing.quantity + quantity },
+        data: { quantity: totalQuantity },
       });
     } else {
       await prisma.cartItem.create({
@@ -135,6 +136,23 @@ export async function PATCH(request: Request) {
     if (quantity <= 0) {
       await prisma.cartItem.deleteMany({ where: { cartId: cart.id, productId, variantId } });
     } else {
+      const product = await prisma.product.findFirst({
+        where: { id: productId, status: "PUBLISHED", deletedAt: null },
+        select: { stock: true },
+      });
+      if (!product) return fail(404, "This product is no longer available");
+
+      let availableStock = product.stock;
+      if (variantId !== null) {
+        const variant = await prisma.productVariant.findFirst({
+          where: { id: variantId, productId, status: "ACTIVE", deletedAt: null },
+          select: { stockQuantity: true },
+        });
+        if (!variant) return fail(404, "This variant is no longer available");
+        availableStock = variant.stockQuantity;
+      }
+      if (quantity > availableStock) return fail(400, `Only ${availableStock} left in stock`);
+
       await prisma.cartItem.updateMany({
         where: { cartId: cart.id, productId, variantId },
         data: { quantity },
