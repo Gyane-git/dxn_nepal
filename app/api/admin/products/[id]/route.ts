@@ -4,6 +4,7 @@ import { ok, fail, handleApiError } from "@/lib/api";
 import { ensureUniqueSlug } from "@/lib/slug";
 import { productSchema } from "@/schemas/admin-product";
 import { syncRelations } from "@/lib/product-relations";
+import { syncDistributorDiscounts, syncDistributorPv } from "@/lib/product-distributor-rules";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -17,6 +18,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       include: {
         images: { orderBy: { sortOrder: "asc" } },
         relationsFrom: { include: { related: { select: { id: true, name: true } } } },
+        distributorDiscounts: true,
+        distributorPvRules: true,
       },
     });
     if (!product) return fail(404, "Product not found");
@@ -34,6 +37,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       relatedIds: product.relationsFrom.filter((r) => r.type === "RELATED").map((r) => r.relatedId),
       crossSellIds: product.relationsFrom.filter((r) => r.type === "CROSS_SELL").map((r) => r.relatedId),
       upSellIds: product.relationsFrom.filter((r) => r.type === "UP_SELL").map((r) => r.relatedId),
+      customerDiscountPercent: product.customerDiscountPercent ? Number(product.customerDiscountPercent) : null,
+      distributorDiscounts: product.distributorDiscounts.map((d) => ({
+        distributorId: d.distributorId,
+        discountPercent: Number(d.discountPercent),
+      })),
+      pvDistributorIds: product.distributorPvRules.map((p) => p.distributorId),
     });
   } catch (error) {
     return handleApiError(error);
@@ -107,13 +116,21 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
           colorway: data.colorway,
           status: data.status,
           publishedAt: !wasPublished && isPublished ? new Date() : existing.publishedAt,
+          hasDiscount: data.hasDiscount,
+          forCustomer: data.hasDiscount && data.forCustomer,
+          customerDiscountPercent: data.hasDiscount && data.forCustomer ? data.customerDiscountPercent : null,
+          forDistributor: data.hasDiscount && data.forDistributor,
+          hasPointValue: data.hasPointValue,
           images: {
             create: data.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: img.sortOrder ?? i })),
           },
         },
       });
 
+      const distributorDiscounts = data.hasDiscount && data.forDistributor ? data.distributorDiscounts : [];
       await syncRelations(tx, id, data.relatedIds, data.crossSellIds, data.upSellIds);
+      await syncDistributorDiscounts(tx, id, distributorDiscounts);
+      await syncDistributorPv(tx, id, data.hasPointValue ? data.pvDistributorIds : [], data.price, distributorDiscounts);
       return updated;
     });
 

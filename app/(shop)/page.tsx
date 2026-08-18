@@ -5,10 +5,14 @@ import { ProductCard } from "@/components/product/ProductCard";
 import { HeroCarousel } from "@/components/home/HeroCarousel";
 import { PromoProductColumns } from "@/components/home/PromoProductColumns";
 import { CategoryBrandGrid } from "@/components/home/CategoryBrandGrid";
+import { getCurrentUser } from "@/lib/session";
+import { resolveViewerProductPricing } from "@/lib/checkoutCore";
+import { computeDiscountedUnitPrice, computeAutoPv } from "@/lib/pricing";
 
 const HERO_BANNER_IMAGE = "/images/hero-banner.jpg";
 
-export const revalidate = 60;
+// Not statically cached: the Featured Products grid shows a logged-in distributor's own
+// personalized price/PV, so this page must render per-request rather than be shared across visitors.
 
 const TRUST_ITEMS = [
   {
@@ -47,26 +51,32 @@ function mapPromoProduct(p: {
   };
 }
 
-function mapProductCard(p: {
-  id: number;
-  name: string;
-  slug: string;
-  price: unknown;
-  compareAtPrice: unknown;
-  colorway: string;
-  stock: number;
-  images: { url: string | null }[];
-  category: { name: string; slug: string } | null;
-  reviews: { rating: number }[];
-}) {
+function mapProductCard(
+  p: {
+    id: number;
+    name: string;
+    slug: string;
+    price: unknown;
+    compareAtPrice: unknown;
+    colorway: string;
+    stock: number;
+    images: { url: string | null }[];
+    category: { name: string; slug: string } | null;
+    reviews: { rating: number }[];
+  },
+  viewerPricing?: { discountPercent: number | null; pvEligible: boolean }
+) {
   const avgRating = p.reviews.length
     ? p.reviews.reduce((sum, r) => sum + r.rating, 0) / p.reviews.length
     : 0;
+  const price = Number(p.price);
+  const distributorPrice =
+    viewerPricing?.discountPercent != null ? computeDiscountedUnitPrice(price, viewerPricing.discountPercent) : null;
   return {
     id: p.id,
     name: p.name,
     slug: p.slug,
-    price: Number(p.price),
+    price,
     compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
     colorway: p.colorway,
     stock: p.stock,
@@ -74,6 +84,9 @@ function mapProductCard(p: {
     category: p.category ?? undefined,
     rating: Math.round(avgRating * 10) / 10,
     reviewCount: p.reviews.length,
+    distributorPrice,
+    // PV is 0.2% of the distributor's own discounted price (falls back to list price if no discount applies).
+    distributorPv: viewerPricing?.pvEligible ? computeAutoPv(distributorPrice ?? price) : 0,
   };
 }
 
@@ -152,6 +165,19 @@ async function getHomeData() {
     }),
   ]);
 
+  const viewer = await getCurrentUser();
+  const viewerPricing = await resolveViewerProductPricing(
+    products.map((p) => ({
+      id: p.id,
+      hasDiscount: p.hasDiscount,
+      forCustomer: p.forCustomer,
+      customerDiscountPercent: p.customerDiscountPercent != null ? Number(p.customerDiscountPercent) : null,
+      forDistributor: p.forDistributor,
+      hasPointValue: p.hasPointValue,
+    })),
+    viewer
+  );
+
   return {
     categories,
     brands,
@@ -163,7 +189,7 @@ async function getHomeData() {
       linkUrl: b.linkUrl,
       buttonText: b.buttonText,
     })),
-    products: products.map(mapProductCard),
+    products: products.map((p) => mapProductCard(p, viewerPricing.get(p.id))),
     specialProducts: specialProducts.map(mapPromoProduct),
     weeklyProducts: weeklyProducts.map(mapPromoProduct),
     flashProducts: flashProducts.map(mapPromoProduct),
@@ -236,6 +262,34 @@ export default async function HomePage() {
         </section>
       )}
 
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <section className="mt-6 border-b border-gray-100 bg-white">
+          <div className="grid grid-cols-1 gap-6 py-8 text-center sm:grid-cols-3">
+            {TRUST_ITEMS.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-start md:justify-center gap-3"
+              >
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth={1.6}
+                  >
+                    {item.icon}
+                  </svg>
+                </span>
+                <span className="text-sm font-medium text-gray-700">
+                  {item.label}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      </div>
+
       <CategoryBrandGrid
         title="Categories"
         items={categories}
@@ -300,34 +354,6 @@ export default async function HomePage() {
           { title: "Trending Now", products: trendingProducts },
         ]}
       />
-
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-        <section className="mt-6 border-b border-gray-100 bg-white">
-          <div className="grid grid-cols-1 gap-6 py-8 text-center sm:grid-cols-3">
-            {TRUST_ITEMS.map((item) => (
-              <div
-                key={item.label}
-                className="flex items-center justify-start md:justify-center gap-3"
-              >
-                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-50 text-primary-600">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="h-5 w-5"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth={1.6}
-                  >
-                    {item.icon}
-                  </svg>
-                </span>
-                <span className="text-sm font-medium text-gray-700">
-                  {item.label}
-                </span>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
     </div>
   );
 }

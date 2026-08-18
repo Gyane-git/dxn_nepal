@@ -28,6 +28,8 @@ interface AdminOrderDetail {
   tax: number;
   taxLabel: string | null;
   total: number;
+  totalPv: number;
+  pvCredited: boolean;
   paymentMethod: string;
   paymentSubMethod: string | null;
   paymentStatus: string;
@@ -37,7 +39,7 @@ interface AdminOrderDetail {
   returnReason: string | null;
   refunded: boolean;
   user: { name: string; email: string; phone: string | null };
-  items: { id: string; name: string; price: number; quantity: number }[];
+  items: { id: string; name: string; price: number; quantity: number; discountPercent: number | null; pvEarned: number }[];
   history: { id: string; status: string; note: string | null; createdAt: string }[];
 }
 
@@ -105,6 +107,8 @@ export default function AdminOrderDetailPage() {
                     <th className="py-2">Product</th>
                     <th className="py-2">Qty</th>
                     <th className="py-2 text-right">Price</th>
+                    <th className="py-2 text-right">Discount</th>
+                    <th className="py-2 text-right">PV</th>
                     <th className="py-2 text-right">Subtotal</th>
                   </tr>
                 </thead>
@@ -114,6 +118,10 @@ export default function AdminOrderDetailPage() {
                       <td className="py-2 text-gray-800">{item.name}</td>
                       <td className="py-2 text-gray-600">{item.quantity}</td>
                       <td className="py-2 text-right text-gray-600">{formatPrice(item.price)}</td>
+                      <td className="py-2 text-right text-gray-500">
+                        {item.discountPercent ? `${item.discountPercent}%` : "—"}
+                      </td>
+                      <td className="py-2 text-right text-gray-500">{item.pvEarned > 0 ? item.pvEarned : "—"}</td>
                       <td className="py-2 text-right text-gray-900">{formatPrice(item.price * item.quantity)}</td>
                     </tr>
                   ))}
@@ -145,6 +153,12 @@ export default function AdminOrderDetailPage() {
                 <span>Total</span>
                 <span>{formatPrice(order.total)}</span>
               </div>
+              {order.totalPv > 0 && (
+                <div className="flex justify-between text-primary-700">
+                  <span>Distributor PV{order.pvCredited ? " (credited)" : " (pending delivery)"}</span>
+                  <span>{order.totalPv} PV</span>
+                </div>
+              )}
             </div>
           </section>
 

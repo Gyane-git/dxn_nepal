@@ -27,6 +27,35 @@ export const paymentSettingsSchema = z.object({
   esewaSecretKey: z.string().max(500).nullable().optional(),
   esewaPaymentUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
   esewaStatusUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+
+  khaltiEnabled: z.boolean().default(false),
+  khaltiLogo: z.string().nullable().optional(),
+  khaltiSecretKey: z.string().max(500).nullable().optional(),
+  khaltiBaseUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+
+  fonepayEnabled: z.boolean().default(false),
+  fonepayLogo: z.string().nullable().optional(),
+  fonepayMerchantCode: z.string().max(100).nullable().optional(),
+  fonepaySecretKey: z.string().max(500).nullable().optional(),
+  fonepayCheckoutUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+  fonepayVerificationUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+
+  connectipsEnabled: z.boolean().default(false),
+  connectipsLogo: z.string().nullable().optional(),
+  connectipsMerchantId: z.string().max(100).nullable().optional(),
+  connectipsAppId: z.string().max(100).nullable().optional(),
+  connectipsAppName: z.string().max(100).nullable().optional(),
+  connectipsPassword: z.string().max(500).nullable().optional(),
+  connectipsPrivateKey: z.string().max(10000).nullable().optional(),
+  connectipsGatewayUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+  connectipsValidationUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+
+  visaEnabled: z.boolean().default(false),
+  visaLogo: z.string().nullable().optional(),
+  visaMerchantId: z.string().max(100).nullable().optional(),
+  visaSecretKey: z.string().max(500).nullable().optional(),
+  visaGatewayUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
+  visaVerificationUrl: z.string().url("Must be a valid URL").nullable().optional().or(z.literal("")),
 });
 
 export type PaymentSettingsInput = z.infer<typeof paymentSettingsSchema>;

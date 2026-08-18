@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/session";
 import { AccountProfileCard } from "@/components/account/AccountProfileCard";
+import { DistributorStatusCard } from "@/components/account/DistributorStatusCard";
 
 export default async function AccountPage() {
   const sessionUser = await getCurrentUser();
@@ -9,7 +10,7 @@ export default async function AccountPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    select: { name: true, email: true, phone: true, image: true, createdAt: true },
+    select: { name: true, email: true, phone: true, image: true, createdAt: true, role: true, distributorId: true, pvBalance: true },
   });
   if (!user) redirect("/login");
 
@@ -37,6 +38,8 @@ export default async function AccountPage() {
         orderCount={orderCount}
         totalSpent={totalSpent}
       />
+
+      <DistributorStatusCard role={user.role} distributorId={user.distributorId} pvBalance={Number(user.pvBalance)} />
     </div>
   );
 }

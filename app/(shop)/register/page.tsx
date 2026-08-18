@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn } from "next-auth/react";
 import { registerSchema, type RegisterInput } from "@/schemas/auth";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
@@ -36,9 +35,7 @@ export default function RegisterPage() {
       return;
     }
 
-    await signIn("credentials", { email: values.email, password: values.password, redirect: false });
-    router.push("/");
-    router.refresh();
+    router.push(`/verify-email?email=${encodeURIComponent(values.email)}`);
   }
 
   return (
@@ -58,6 +55,13 @@ export default function RegisterPage() {
             autoComplete="new-password"
             error={errors.password?.message}
             {...register("password")}
+          />
+          <Input
+            label="Confirm Password"
+            type="password"
+            autoComplete="new-password"
+            error={errors.confirmPassword?.message}
+            {...register("confirmPassword")}
           />
           {formError && <p className="text-sm text-red-600">{formError}</p>}
           <Button type="submit" size="lg" isLoading={isSubmitting}>

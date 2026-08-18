@@ -44,14 +44,8 @@ export function WishlistButton({
     }
   }
 
-  // const dimensions = size === "lg" ? "h-11 w-11" : "h-8 w-8";
-  // const iconSize = size === "lg" ? "h-5 w-5" : "h-4 w-4";
-
-  const dimensions =
-    size === "lg" ? "h-9 w-9 sm:h-10 sm:w-10 lg:h-11 lg:w-11" : "h-8 w-8";
-
-  const iconSize =
-    size === "lg" ? "h-4 w-4 sm:h-5 sm:w-5 lg:h-5 lg:w-5" : "h-4 w-4";
+  const dimensions = size === "lg" ? "h-11 w-11" : "h-8 w-8";
+  const iconSize = size === "lg" ? "h-5 w-5" : "h-4 w-4";
 
   return (
     <button
@@ -64,11 +58,7 @@ export function WishlistButton({
         active ? "text-secondary-500" : ""
       } ${className}`}
     >
-      <Heart
-        className={iconSize}
-        strokeWidth={1.8}
-        fill={active ? "currentColor" : "none"}
-      />
+      <Heart className={iconSize} strokeWidth={1.8} fill={active ? "currentColor" : "none"} />
     </button>
   );
 }

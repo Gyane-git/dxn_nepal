@@ -33,9 +33,12 @@ export async function GET(request: Request) {
       subtotal: Number(order.subtotal),
       discount: Number(order.discount),
       total: Number(order.total),
+      totalPv: Number(order.totalPv),
       items: order.items.map((item) => ({
         ...item,
         price: Number(item.price),
+        discountPercent: item.discountPercent ? Number(item.discountPercent) : null,
+        pvEarned: Number(item.pvEarned),
         reviewed: item.reviews.length > 0,
         productSlug: item.product && !item.product.deletedAt ? item.product.slug : null,
         product: undefined,

@@ -18,6 +18,8 @@ interface OrderItem {
   image: string | null;
   price: number;
   quantity: number;
+  discountPercent: number | null;
+  pvEarned: number;
   reviewed: boolean;
 }
 
@@ -36,6 +38,7 @@ export interface Order {
   total: number;
   paymentMethod: "COD" | "ONLINE";
   paymentStatus: "PENDING" | "PAID" | "FAILED";
+  totalPv: number;
   trackingNumber: string | null;
   courierName: string | null;
   returnRequested: boolean;
@@ -139,14 +142,24 @@ export function OrderCard({ order, onChanged }: { order: Order; onChanged: () =>
       </div>
 
       <ul className="mt-4 divide-y divide-gray-50 text-sm">
-        {order.items.map((item) =>
-          item.productSlug ? (
+        {order.items.map((item) => {
+          const nameContent = (
+            <span className="min-w-0 flex-1 truncate">
+              {item.name} × {item.quantity}
+              {item.discountPercent ? (
+                <span className="ml-1.5 rounded-full bg-primary-50 px-1.5 py-0.5 text-[11px] font-medium text-primary-700">
+                  {item.discountPercent}% off
+                </span>
+              ) : null}
+            </span>
+          );
+          return item.productSlug ? (
             <li key={item.id} className="flex items-center gap-3 py-2.5">
               <Link href={`/product/${item.productSlug}`} className="shrink-0 w-12">
                 <ProductImage src={item.image} alt={item.name} />
               </Link>
-              <Link href={`/product/${item.productSlug}`} className="min-w-0 flex-1 truncate text-gray-800 hover:text-primary-600">
-                {item.name} × {item.quantity}
+              <Link href={`/product/${item.productSlug}`} className="flex min-w-0 flex-1 items-center text-gray-800 hover:text-primary-600">
+                {nameContent}
               </Link>
               <span className="shrink-0 text-gray-600">{formatPrice(item.price * item.quantity)}</span>
             </li>
@@ -155,17 +168,23 @@ export function OrderCard({ order, onChanged }: { order: Order; onChanged: () =>
               <span className="shrink-0 w-12">
                 <ProductImage src={item.image} alt={item.name} />
               </span>
-              <span className="min-w-0 flex-1 truncate text-gray-500">{item.name} × {item.quantity}</span>
+              <span className="flex min-w-0 flex-1 items-center text-gray-500">{nameContent}</span>
               <span className="shrink-0 text-gray-600">{formatPrice(item.price * item.quantity)}</span>
             </li>
-          )
-        )}
+          );
+        })}
       </ul>
 
       <div className="mt-3 flex justify-between border-t border-gray-100 pt-3 text-sm font-semibold text-gray-900">
         <span>Total</span>
         <span>{formatPrice(order.total)}</span>
       </div>
+      {order.totalPv > 0 && (
+        <div className="mt-1 flex justify-between text-xs font-medium text-primary-700">
+          <span>PV earned</span>
+          <span>{order.totalPv} PV</span>
+        </div>
+      )}
 
       <a
         href={`/api/orders/${order.id}/invoice`}

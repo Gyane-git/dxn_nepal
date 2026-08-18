@@ -321,6 +321,52 @@ export function welcomeEmail(user: { name: string }) {
   };
 }
 
+export function distributorApplicationApprovedEmail(user: { name: string; distributorId: string }) {
+  const bodyHtml = `
+    <h1 style="margin:0 0 6px;font-size:21px;color:#111827;font-family:Arial,Helvetica,sans-serif;">You're now a DXN Distributor!</h1>
+    <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
+      Hi ${escapeHtml(user.name)}, congratulations — your distributor application has been approved. Your Distributor ID is:
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      <tr>
+        <td style="background-color:#f9fafb;border-left:4px solid ${BRAND_PRIMARY};border-radius:6px;padding:16px 18px;font-size:18px;font-weight:bold;letter-spacing:1px;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+          ${escapeHtml(user.distributorId)}
+        </td>
+      </tr>
+    </table>
+    <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
+      You can log in with either your email or this Distributor ID going forward.
+    </p>
+    ${button("Go to Your Account", `${SITE_URL}/account`)}
+  `;
+
+  return {
+    subject: "Your DXN Distributor application was approved",
+    html: emailLayout({ preheader: `Your Distributor ID is ${user.distributorId}.`, bodyHtml }),
+    text: `Hi ${user.name}, congratulations — your distributor application has been approved. Your Distributor ID is ${user.distributorId}. You can log in with either your email or this Distributor ID. View your account: ${SITE_URL}/account`,
+  };
+}
+
+export function distributorApplicationRejectedEmail(user: { name: string }, reason?: string | null) {
+  const bodyHtml = `
+    <h1 style="margin:0 0 6px;font-size:21px;color:#111827;font-family:Arial,Helvetica,sans-serif;">Update on your Distributor application</h1>
+    <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
+      Hi ${escapeHtml(user.name)}, after review, we're unable to approve your distributor application at this time.
+      ${reason ? `<br /><br />Reason: ${escapeHtml(reason)}` : ""}
+    </p>
+    <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
+      Your account remains active as a regular customer. You're welcome to submit a new application in the future.
+    </p>
+    ${button("Go to Your Account", `${SITE_URL}/account`)}
+  `;
+
+  return {
+    subject: "Update on your DXN Distributor application",
+    html: emailLayout({ preheader: "Your distributor application was not approved.", bodyHtml }),
+    text: `Hi ${user.name}, after review, we're unable to approve your distributor application at this time.${reason ? ` Reason: ${reason}` : ""} Your account remains active as a regular customer. View your account: ${SITE_URL}/account`,
+  };
+}
+
 export function orderStatusUpdateEmail(order: { orderNumber: string; fullName: string }, message: string) {
   const bodyHtml = `
     <h1 style="margin:0 0 6px;font-size:21px;color:#111827;font-family:Arial,Helvetica,sans-serif;">
@@ -351,7 +397,7 @@ export function passwordResetEmail(resetUrl: string) {
     <h1 style="margin:0 0 6px;font-size:21px;color:#111827;font-family:Arial,Helvetica,sans-serif;">Reset your password</h1>
     <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
       We received a request to reset your DXN account password. Click the button below to choose a new one —
-      this link expires in <strong>1 hour</strong>.
+      this link expires in <strong>10 minutes</strong>.
     </p>
     ${button("Reset Password", resetUrl)}
     <p style="margin:20px 0 0;font-size:12px;line-height:18px;color:#9ca3af;font-family:Arial,Helvetica,sans-serif;">
@@ -361,7 +407,32 @@ export function passwordResetEmail(resetUrl: string) {
 
   return {
     subject: "Reset your DXN password",
-    html: emailLayout({ preheader: "Reset your DXN password — link expires in 1 hour.", bodyHtml }),
-    text: `Reset your password: ${resetUrl} (expires in 1 hour). If you didn't request this, ignore this email.`,
+    html: emailLayout({ preheader: "Reset your DXN password — link expires in 10 minutes.", bodyHtml }),
+    text: `Reset your password: ${resetUrl} (expires in 10 minutes). If you didn't request this, ignore this email.`,
+  };
+}
+
+export function otpVerificationEmail(code: string) {
+  const bodyHtml = `
+    <h1 style="margin:0 0 6px;font-size:21px;color:#111827;font-family:Arial,Helvetica,sans-serif;">Verify your email</h1>
+    <p style="margin:0 0 20px;font-size:14px;line-height:21px;color:#6b7280;font-family:Arial,Helvetica,sans-serif;">
+      Use the code below to verify your DXN account — it expires in <strong>10 minutes</strong>.
+    </p>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:20px;">
+      <tr>
+        <td align="center" style="background-color:#f9fafb;border-left:4px solid ${BRAND_PRIMARY};border-radius:6px;padding:18px;font-size:28px;font-weight:bold;letter-spacing:8px;color:#111827;font-family:Arial,Helvetica,sans-serif;">
+          ${escapeHtml(code)}
+        </td>
+      </tr>
+    </table>
+    <p style="margin:20px 0 0;font-size:12px;line-height:18px;color:#9ca3af;font-family:Arial,Helvetica,sans-serif;">
+      If you didn't request this, you can safely ignore this email.
+    </p>
+  `;
+
+  return {
+    subject: `${code} is your DXN verification code`,
+    html: emailLayout({ preheader: `Your DXN verification code expires in 10 minutes.`, bodyHtml }),
+    text: `Your DXN verification code is ${code} (expires in 10 minutes). If you didn't request this, ignore this email.`,
   };
 }

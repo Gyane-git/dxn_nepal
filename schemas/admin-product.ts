@@ -6,7 +6,12 @@ const imageInputSchema = z.object({
   sortOrder: z.number().int().default(0),
 });
 
-export const productSchema = z.object({
+const distributorDiscountRuleSchema = z.object({
+  distributorId: z.coerce.number().int(),
+  discountPercent: z.number().min(0, "Must be 0 or more").max(100, "Must be 100 or less"),
+});
+
+const baseProductSchema = z.object({
   name: z.string().min(1, "Name is required").max(200),
   slug: z.string().max(220).optional(),
   sku: z.string().max(80).nullable().optional(),
@@ -60,9 +65,60 @@ export const productSchema = z.object({
   relatedIds: z.array(z.coerce.number().int()).default([]),
   crossSellIds: z.array(z.coerce.number().int()).default([]),
   upSellIds: z.array(z.coerce.number().int()).default([]),
+
+  hasDiscount: z.boolean().default(false),
+  forCustomer: z.boolean().default(false),
+  customerDiscountPercent: z.number().min(0).max(100).nullable().optional(),
+  forDistributor: z.boolean().default(false),
+  distributorDiscounts: z.array(distributorDiscountRuleSchema).default([]),
+
+  hasPointValue: z.boolean().default(false),
+  pvDistributorIds: z.array(z.coerce.number().int()).default([]),
 });
 
-export type ProductInput = z.infer<typeof productSchema>;
+export const productSchema = baseProductSchema.superRefine((data, ctx) => {
+  if (!data.hasDiscount) return;
+
+  if (data.forCustomer && (data.customerDiscountPercent === null || data.customerDiscountPercent === undefined)) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["customerDiscountPercent"],
+      message: "Customer discount percentage is required",
+    });
+  }
+
+  if (data.forDistributor) {
+    if (data.distributorDiscounts.length === 0) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["distributorDiscounts"],
+        message: "Select at least one distributor and a discount percentage",
+      });
+    }
+    const seen = new Set<number>();
+    for (const [i, rule] of data.distributorDiscounts.entries()) {
+      if (seen.has(rule.distributorId)) {
+        ctx.addIssue({ code: "custom", path: ["distributorDiscounts", i], message: "Duplicate distributor" });
+      }
+      seen.add(rule.distributorId);
+    }
+  }
+}).superRefine((data, ctx) => {
+  if (!data.hasPointValue) return;
+
+  if (data.pvDistributorIds.length === 0) {
+    ctx.addIssue({
+      code: "custom",
+      path: ["pvDistributorIds"],
+      message: "Select at least one distributor to earn PV on this product",
+    });
+  }
+  if (new Set(data.pvDistributorIds).size !== data.pvDistributorIds.length) {
+    ctx.addIssue({ code: "custom", path: ["pvDistributorIds"], message: "Duplicate distributor" });
+  }
+});
+
+export type ProductInput = z.infer<typeof baseProductSchema>;
 
 export const productBulkActionSchema = z.object({
   ids: z.array(z.coerce.number().int()).min(1),

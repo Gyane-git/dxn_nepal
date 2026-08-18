@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { WishlistButton } from "@/components/product/WishlistButton";
 import { formatPrice } from "@/lib/format";
 import { useToast } from "@/context/ToastContext";
+import { computeAutoPv, computeDiscountedUnitPrice } from "@/lib/pricing";
 
 interface AttributeValueOption {
   id: number;
@@ -39,6 +40,8 @@ export function ProductPurchasePanel({
   variantGroups,
   variants,
   initialSelected,
+  distributorDiscountPercent = null,
+  pvEligible = false,
 }: {
   productId: number;
   basePrice: number;
@@ -47,6 +50,10 @@ export function ProductPurchasePanel({
   variantGroups: VariantGroup[];
   variants: VariantOption[];
   initialSelected?: Record<number, number>;
+  /** Set only for a logged-in, approved distributor viewer — their own discount % for this product. */
+  distributorDiscountPercent?: number | null;
+  /** Set only for a logged-in, approved distributor viewer eligible for PV on this product. */
+  pvEligible?: boolean;
 }) {
   const { addItem } = useCart();
   const showToast = useToast();
@@ -105,6 +112,11 @@ export function ProductPurchasePanel({
     effectiveCompareAtPrice > effectivePrice;
   const outOfStock = effectiveStock <= 0;
 
+  const distributorPrice =
+    distributorDiscountPercent != null ? computeDiscountedUnitPrice(effectivePrice, distributorDiscountPercent) : null;
+  // PV is 0.2% of the distributor's own discounted price (falls back to list price if no discount applies).
+  const pvPerUnit = pvEligible ? computeAutoPv(distributorPrice ?? effectivePrice) : 0;
+
   async function handleAction(after: () => void) {
     if (hasVariants && !isComplete) {
       setError(
@@ -161,18 +173,41 @@ export function ProductPurchasePanel({
     if (!ok) setIsBuyingNow(false);
   }
 
+  const displayPrice = distributorPrice ?? effectivePrice;
+
   return (
     <div>
       <div className="flex items-baseline gap-3">
         <span className="text-3xl font-bold text-primary-700">
-          {formatPrice(effectivePrice)}
+          {formatPrice(displayPrice)}
         </span>
-        {onSale && (
+        {distributorPrice !== null ? (
           <span className="text-lg text-gray-400 line-through">
-            {formatPrice(effectiveCompareAtPrice!)}
+            {formatPrice(effectivePrice)}
           </span>
+        ) : (
+          onSale && (
+            <span className="text-lg text-gray-400 line-through">
+              {formatPrice(effectiveCompareAtPrice!)}
+            </span>
+          )
         )}
       </div>
+
+      {(distributorPrice !== null || pvPerUnit > 0) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          {distributorPrice !== null && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
+              Distributor price
+            </span>
+          )}
+          {pvPerUnit > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-3 py-1 text-sm font-medium text-amber-700">
+              Earn {Math.round(pvPerUnit * quantity * 100) / 100} PV
+            </span>
+          )}
+        </div>
+      )}
 
       {hasVariants && (
         <div className="mt-5 flex flex-col gap-4">
@@ -290,34 +325,32 @@ export function ProductPurchasePanel({
             </span>
           </div>
 
-          <div className="flex gap-2 sm:gap-3 items-center">
+          <div className="flex gap-3">
             <Button
               variant="outline"
               size="lg"
-              className="flex-1 px-1 py-1 text-xs sm:px-4 sm:py-3 sm:text-base whitespace-nowrap"
+              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
               disabled={outOfStock && isComplete}
               isLoading={isAdding}
               onClick={handleAdd}
             >
               {added ? "Added ✓" : "Add to Cart"}
             </Button>
-
             <Button
               variant="primary"
               size="lg"
-              className="flex-1 px-2 py-1.5 text-xs sm:px-4 sm:py-3 sm:text-base"
+              className="flex-1 px-3 py-2 text-sm sm:px-4 sm:py-3 sm:text-base"
               disabled={outOfStock && isComplete}
               isLoading={isBuyingNow}
               onClick={handleBuyNow}
             >
               Buy Now
             </Button>
-
             <WishlistButton
               productId={productId}
               variantId={matchedVariant?.id ?? null}
               size="lg"
-              className="border border-gray-200 shadow-none text"
+              className="border border-gray-200 shadow-none"
             />
           </div>
 

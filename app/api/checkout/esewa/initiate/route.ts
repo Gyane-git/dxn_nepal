@@ -7,6 +7,7 @@ import {
   computeSubtotal,
   computeShippingAndTax,
   loadValidatedCart,
+  resolveCartPricing,
   resolveShippingAddress,
 } from "@/lib/checkoutCore";
 import { getPaymentSettings } from "@/lib/settings";
@@ -28,7 +29,8 @@ export async function POST(request: Request) {
     const shipping = await resolveShippingAddress(user, body, { persist: false });
 
     const cart = await loadValidatedCart(user.id);
-    const subtotal = computeSubtotal(cart);
+    const pricing = await resolveCartPricing(cart, user);
+    const subtotal = computeSubtotal(cart, pricing);
     const { discount } = await applyCoupon(subtotal, body.couponCode);
     const { shippingFee, tax, total } = await computeShippingAndTax(shipping.country, subtotal, discount, shipping.municipalityId);
 

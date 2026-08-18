@@ -11,7 +11,13 @@ import { ShippingTab } from "@/components/admin/products/tabs/ShippingTab";
 import { MediaTab } from "@/components/admin/products/tabs/MediaTab";
 import { FlagsSeoTab } from "@/components/admin/products/tabs/FlagsSeoTab";
 import { RelatedTab } from "@/components/admin/products/tabs/RelatedTab";
+import { DistributorPricingTab } from "@/components/admin/products/tabs/DistributorPricingTab";
 import { VariantsManager } from "@/components/admin/products/VariantsManager";
+
+export interface DistributorDiscountRule {
+  distributorId: number;
+  discountPercent: string;
+}
 
 export interface ProductFormValues {
   id?: string;
@@ -67,6 +73,15 @@ export interface ProductFormValues {
   relatedIds: string[];
   crossSellIds: string[];
   upSellIds: string[];
+
+  hasDiscount: boolean;
+  forCustomer: boolean;
+  customerDiscountPercent: string;
+  forDistributor: boolean;
+  distributorDiscounts: DistributorDiscountRule[];
+
+  hasPointValue: boolean;
+  pvDistributorIds: number[];
 }
 
 export const EMPTY_PRODUCT: ProductFormValues = {
@@ -112,11 +127,21 @@ export const EMPTY_PRODUCT: ProductFormValues = {
   relatedIds: [],
   crossSellIds: [],
   upSellIds: [],
+
+  hasDiscount: false,
+  forCustomer: false,
+  customerDiscountPercent: "",
+  forDistributor: false,
+  distributorDiscounts: [],
+
+  hasPointValue: false,
+  pvDistributorIds: [],
 };
 
 const TABS = [
   "General",
   "Pricing",
+  "Distributor Pricing",
   "Inventory",
   "Shipping",
   "Media",
@@ -145,6 +170,11 @@ function toPayload(values: ProductFormValues) {
     width: num(values.width),
     height: num(values.height),
     images: values.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: i })),
+    customerDiscountPercent: num(values.customerDiscountPercent),
+    distributorDiscounts: values.distributorDiscounts.map((r) => ({
+      distributorId: r.distributorId,
+      discountPercent: num(r.discountPercent) ?? 0,
+    })),
   };
 }
 
@@ -199,6 +229,7 @@ export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps
 
       {tab === "General" && <GeneralTab values={values} set={set} />}
       {tab === "Pricing" && <PricingTab values={values} set={set} />}
+      {tab === "Distributor Pricing" && <DistributorPricingTab values={values} set={set} />}
       {tab === "Inventory" && <InventoryTab values={values} set={set} />}
       {tab === "Shipping" && <ShippingTab values={values} set={set} />}
       {tab === "Media" && <MediaTab values={values} set={set} />}

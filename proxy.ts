@@ -25,7 +25,7 @@ export async function proxy(request: NextRequest) {
     }
   }
 
-  if (pathname.startsWith("/account") || pathname.startsWith("/checkout")) {
+  if (pathname.startsWith("/account") || pathname.startsWith("/checkout") || pathname.startsWith("/distributor")) {
     if (!token) {
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("callbackUrl", pathname);
@@ -37,5 +37,5 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*", "/login", "/register"],
+  matcher: ["/admin/:path*", "/account/:path*", "/checkout/:path*", "/distributor/:path*", "/login", "/register"],
 };

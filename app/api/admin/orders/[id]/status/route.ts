@@ -75,6 +75,13 @@ export async function PATCH(
         if (order.paymentMethod === "COD" && order.paymentStatus === "PENDING") {
           data.paymentStatus = "PAID";
         }
+        if (!order.pvCredited && Number(order.totalPv) > 0) {
+          data.pvCredited = true;
+          await tx.user.update({
+            where: { id: order.userId },
+            data: { pvBalance: { increment: order.totalPv } },
+          });
+        }
         message = `Your order ${order.orderNumber} has been delivered.`;
       }
 

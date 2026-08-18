@@ -16,6 +16,10 @@ export interface ProductCardData {
   rating?: number;
   reviewCount?: number;
   category?: { name: string; slug: string };
+  /** Set only for a logged-in, approved distributor viewer — their own discounted price for this product. */
+  distributorPrice?: number | null;
+  /** Set only for a logged-in, approved distributor viewer — PV they'd earn per unit. */
+  distributorPv?: number;
 }
 
 export function ProductCard({
@@ -28,7 +32,9 @@ export function ProductCard({
   /** Appended to the product link, e.g. "color=red" — used to carry a shop filter into the product page. */
   linkQuery?: string;
 }) {
-  const onSale = product.compareAtPrice && product.compareAtPrice > product.price;
+  const hasDistributorPrice = product.distributorPrice != null;
+  const displayPrice = hasDistributorPrice ? product.distributorPrice! : product.price;
+  const onSale = !hasDistributorPrice && product.compareAtPrice && product.compareAtPrice > product.price;
 
   return (
     <Link
@@ -67,10 +73,19 @@ export function ProductCard({
           <StarRating rating={product.rating} count={product.reviewCount} />
         )}
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-lg font-bold text-primary-700">{formatPrice(product.price)}</span>
-          {onSale && (
-            <span className="text-sm text-gray-400 line-through">
-              {formatPrice(product.compareAtPrice as number)}
+          <span className="text-lg font-bold text-primary-700">{formatPrice(displayPrice)}</span>
+          {hasDistributorPrice ? (
+            <span className="text-sm text-gray-400 line-through">{formatPrice(product.price)}</span>
+          ) : (
+            onSale && (
+              <span className="text-sm text-gray-400 line-through">
+                {formatPrice(product.compareAtPrice as number)}
+              </span>
+            )
+          )}
+          {!!product.distributorPv && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+              PV {product.distributorPv}
             </span>
           )}
         </div>

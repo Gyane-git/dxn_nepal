@@ -14,6 +14,13 @@ datasource db {
 enum Role {
   USER
   ADMIN
+  DISTRIBUTOR
+}
+
+enum DistributorApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }
 
 enum PaymentMethod {
@@ -99,25 +106,64 @@ enum AddressType {
 }
 
 model User {
-  id           Int      @id @default(autoincrement())
-  name         String
-  image        String?
-  email        String   @unique
-  passwordHash String
-  phone        String?
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id                    Int       @id @default(autoincrement())
+  name                  String
+  image                 String?
+  email                 String    @unique
+  passwordHash          String
+  phone                 String?
+  role                  Role      @default(USER)
+  distributorId         String?   @unique
+  distributorApprovedAt DateTime?
+  pvBalance             Decimal   @default(0) @db.Decimal(10, 2)
+  emailVerified         Boolean   @default(true)
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
-  addresses           Address[]
-  cart                Cart?
-  wishlist            Wishlist?
-  orders              Order[]
-  reviews             Review[]
-  notifications       Notification[]
-  passwordResetTokens PasswordResetToken[]
+  addresses               Address[]
+  cart                    Cart?
+  wishlist                Wishlist?
+  orders                  Order[]
+  reviews                 Review[]
+  notifications           Notification[]
+  passwordResetTokens     PasswordResetToken[]
+  emailOtps               EmailOtp[]
+  distributorApplications DistributorApplication[]     @relation("Applicant")
+  reviewedApplications    DistributorApplication[]     @relation("ApplicationReviewer")
+  distributorDiscounts    ProductDistributorDiscount[]
+  distributorPvRules      ProductDistributorPv[]
 
   @@map("user")
+}
+
+model DistributorApplication {
+  id              Int                          @id @default(autoincrement())
+  userId          Int
+  fullName        String
+  phone           String?
+  reason          String?                      @db.Text
+  status          DistributorApplicationStatus @default(PENDING)
+  distributorId   String?
+  reviewedById    Int?
+  reviewedAt      DateTime?
+  rejectionReason String?                      @db.Text
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  user       User  @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy User? @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("distributorapplication")
+}
+
+model DistributorSequence {
+  id        String   @id @default("singleton")
+  lastValue Int      @default(100000)
+  updatedAt DateTime @updatedAt
+
+  @@map("distributorsequence")
 }
 
 model Address {
@@ -274,22 +320,30 @@ model Product {
   tags     Json?
   colorway String  @default("green")
 
+  hasDiscount             Boolean  @default(false)
+  forCustomer             Boolean  @default(false)
+  customerDiscountPercent Decimal? @db.Decimal(5, 2)
+  forDistributor          Boolean  @default(false)
+  hasPointValue           Boolean  @default(false)
+
   status      ProductStatus @default(DRAFT)
   publishedAt DateTime?
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   deletedAt   DateTime?
 
-  category      Category          @relation(fields: [categoryId], references: [id])
-  brand         Brand?            @relation(fields: [brandId], references: [id])
-  images        ProductImage[]
-  variants      ProductVariant[]
-  relationsFrom ProductRelation[] @relation("ProductRelationsFrom")
-  relationsTo   ProductRelation[] @relation("ProductRelationsTo")
-  cartItems     CartItem[]
-  wishlistItems WishlistItem[]
-  orderItems    OrderItem[]
-  reviews       Review[]
+  category             Category                     @relation(fields: [categoryId], references: [id])
+  brand                Brand?                       @relation(fields: [brandId], references: [id])
+  images               ProductImage[]
+  variants             ProductVariant[]
+  relationsFrom        ProductRelation[]            @relation("ProductRelationsFrom")
+  relationsTo          ProductRelation[]            @relation("ProductRelationsTo")
+  cartItems            CartItem[]
+  wishlistItems        WishlistItem[]
+  orderItems           OrderItem[]
+  reviews              Review[]
+  distributorDiscounts ProductDistributorDiscount[]
+  distributorPvRules   ProductDistributorPv[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -326,6 +380,40 @@ model ProductRelation {
   @@index([productId])
   @@index([relatedId])
   @@map("productrelation")
+}
+
+model ProductDistributorDiscount {
+  id              Int      @id @default(autoincrement())
+  productId       Int
+  distributorId   Int
+  discountPercent Decimal  @db.Decimal(5, 2)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  distributor User    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, distributorId])
+  @@index([productId])
+  @@index([distributorId])
+  @@map("productdistributordiscount")
+}
+
+model ProductDistributorPv {
+  id            Int      @id @default(autoincrement())
+  productId     Int
+  distributorId Int
+  pvValue       Decimal  @db.Decimal(10, 2)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  product     Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  distributor User    @relation(fields: [distributorId], references: [id], onDelete: Cascade)
+
+  @@unique([productId, distributorId])
+  @@index([productId])
+  @@index([distributorId])
+  @@map("productdistributorpv")
 }
 
 model Attribute {
@@ -549,6 +637,9 @@ model Order {
   returnReason    String?
   refunded        Boolean @default(false)
 
+  totalPv    Decimal @default(0) @db.Decimal(10, 2)
+  pvCredited Boolean @default(false)
+
   placedAt  DateTime @default(now())
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -572,6 +663,9 @@ model OrderItem {
   image     String?
   price     Decimal @db.Decimal(10, 2)
   quantity  Int
+
+  discountPercent Decimal? @db.Decimal(5, 2)
+  pvEarned        Decimal  @default(0) @db.Decimal(10, 2)
 
   order   Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
   product Product  @relation(fields: [productId], references: [id])
@@ -645,6 +739,20 @@ model PasswordResetToken {
   @@map("passwordresettoken")
 }
 
+model EmailOtp {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  codeHash  String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("emailotp")
+}
+
 model EmailSettings {
   id           String   @id @default("singleton")
   enabled      Boolean  @default(false)
@@ -671,7 +779,37 @@ model PaymentSettings {
   esewaSecretKey    String?
   esewaPaymentUrl   String?
   esewaStatusUrl    String?
-  updatedAt         DateTime @updatedAt
+
+  khaltiEnabled   Boolean @default(false)
+  khaltiLogo      String?
+  khaltiSecretKey String?
+  khaltiBaseUrl   String?
+
+  fonepayEnabled         Boolean @default(false)
+  fonepayLogo            String?
+  fonepayMerchantCode    String?
+  fonepaySecretKey       String?
+  fonepayCheckoutUrl     String?
+  fonepayVerificationUrl String?
+
+  connectipsEnabled       Boolean @default(false)
+  connectipsLogo          String?
+  connectipsMerchantId    String?
+  connectipsAppId         String?
+  connectipsAppName       String?
+  connectipsPassword      String?
+  connectipsPrivateKey    String? @db.Text
+  connectipsGatewayUrl    String?
+  connectipsValidationUrl String?
+
+  visaEnabled         Boolean @default(false)
+  visaLogo            String?
+  visaMerchantId      String?
+  visaSecretKey       String?
+  visaGatewayUrl      String?
+  visaVerificationUrl String?
+
+  updatedAt DateTime @updatedAt
 
   @@map("paymentsettings")
 }

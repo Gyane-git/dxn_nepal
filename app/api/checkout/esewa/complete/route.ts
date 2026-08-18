@@ -11,6 +11,7 @@ import {
   computeShippingAndTax,
   createOrderFromCart,
   loadValidatedCart,
+  resolveCartPricing,
   resolveShippingAddress,
 } from "@/lib/checkoutCore";
 import { getPaymentSettings } from "@/lib/settings";
@@ -35,7 +36,8 @@ export async function POST(request: Request) {
 
     const shipping = await resolveShippingAddress(user, body);
     const cart = await loadValidatedCart(user.id);
-    const subtotal = computeSubtotal(cart);
+    const pricing = await resolveCartPricing(cart, user);
+    const subtotal = computeSubtotal(cart, pricing);
     const { discount, couponId } = await applyCoupon(subtotal, body.couponCode);
     const { shippingFee, tax, taxLabel, total } = await computeShippingAndTax(shipping.country, subtotal, discount, shipping.municipalityId);
 
@@ -59,6 +61,7 @@ export async function POST(request: Request) {
       userId: user.id,
       shipping,
       cart,
+      pricing,
       subtotal,
       discount,
       shippingFee,
@@ -76,7 +79,7 @@ export async function POST(request: Request) {
 
     const items = cart.items.map((item) => ({
       name: item.product.name,
-      price: Number(item.product.price),
+      price: pricing.get(item.id)!.unitPrice,
       quantity: item.quantity,
     }));
 

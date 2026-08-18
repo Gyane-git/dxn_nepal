@@ -5,6 +5,8 @@ import { ProductGallery } from "@/components/product/ProductGallery";
 import { StarRating } from "@/components/ui/StarRating";
 import { ProductPurchasePanel } from "@/components/product/ProductPurchasePanel";
 import { formatDate } from "@/lib/format";
+import { getCurrentUser } from "@/lib/session";
+import { resolveViewerProductPricing } from "@/lib/checkoutCore";
 
 interface ProductPageProps {
   params: Promise<{ slug: string }>;
@@ -50,6 +52,22 @@ export default async function ProductPage({
   });
 
   if (!product) notFound();
+
+  const viewer = await getCurrentUser();
+  const viewerPricing = await resolveViewerProductPricing(
+    [
+      {
+        id: product.id,
+        hasDiscount: product.hasDiscount,
+        forCustomer: product.forCustomer,
+        customerDiscountPercent: product.customerDiscountPercent != null ? Number(product.customerDiscountPercent) : null,
+        forDistributor: product.forDistributor,
+        hasPointValue: product.hasPointValue,
+      },
+    ],
+    viewer
+  );
+  const { discountPercent: distributorDiscountPercent = null, pvEligible = false } = viewerPricing.get(product.id) ?? {};
 
   const avgRating = product.reviews.length
     ? product.reviews.reduce((sum, r) => sum + r.rating, 0) /
@@ -184,6 +202,8 @@ export default async function ProductPage({
               variantGroups={variantGroups}
               variants={variantOptions}
               initialSelected={initialSelected}
+              distributorDiscountPercent={distributorDiscountPercent}
+              pvEligible={pvEligible}
             />
           </div>
         </div>

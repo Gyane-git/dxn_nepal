@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/product/ProductCard";
+import { getCurrentUser } from "@/lib/session";
+import { resolveViewerProductPricing } from "@/lib/checkoutCore";
+import { computeDiscountedUnitPrice, computeAutoPv } from "@/lib/pricing";
 import type { Prisma } from "@prisma/client";
 
 const PAGE_SIZE = 12;
@@ -95,6 +98,19 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const products = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  const viewer = await getCurrentUser();
+  const viewerPricing = await resolveViewerProductPricing(
+    products.map((p) => ({
+      id: p.id,
+      hasDiscount: p.hasDiscount,
+      forCustomer: p.forCustomer,
+      customerDiscountPercent: p.customerDiscountPercent != null ? Number(p.customerDiscountPercent) : null,
+      forDistributor: p.forDistributor,
+      hasPointValue: p.hasPointValue,
+    })),
+    viewer
+  );
 
   function withParams(overrides: Record<string, string | undefined>) {
     const next = new URLSearchParams();
@@ -298,26 +314,34 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-              {products.map((p) => (
-                <ProductCard
-                  key={p.id}
-                  className="border border-gray-200"
-                  linkQuery={color ? `color=${color}` : undefined}
-                  product={{
-                    id: p.id,
-                    name: p.name,
-                    slug: p.slug,
-                    price: Number(p.price),
-                    compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
-                    colorway: p.colorway,
-                    stock: p.stock,
-                    image: p.images[0]?.url ?? null,
-                    category: p.category,
-                    rating: Math.round(p.avgRating * 10) / 10,
-                    reviewCount: p.reviews.length,
-                  }}
-                />
-              ))}
+              {products.map((p) => {
+                const price = Number(p.price);
+                const vp = viewerPricing.get(p.id);
+                const distributorPrice = vp?.discountPercent != null ? computeDiscountedUnitPrice(price, vp.discountPercent) : null;
+                return (
+                  <ProductCard
+                    key={p.id}
+                    className="border border-gray-200"
+                    linkQuery={color ? `color=${color}` : undefined}
+                    product={{
+                      id: p.id,
+                      name: p.name,
+                      slug: p.slug,
+                      price,
+                      compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+                      colorway: p.colorway,
+                      stock: p.stock,
+                      image: p.images[0]?.url ?? null,
+                      category: p.category,
+                      rating: Math.round(p.avgRating * 10) / 10,
+                      reviewCount: p.reviews.length,
+                      distributorPrice,
+                      // PV is 0.2% of the distributor's own discounted price (falls back to list price if no discount applies).
+                      distributorPv: vp?.pvEligible ? computeAutoPv(distributorPrice ?? price) : 0,
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
 

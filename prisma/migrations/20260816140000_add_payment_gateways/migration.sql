@@ -1,0 +1,21 @@
+-- AlterTable
+ALTER TABLE `paymentsettings`
+    ADD COLUMN `khaltiEnabled` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `khaltiLogo` VARCHAR(191) NULL,
+    ADD COLUMN `khaltiSecretKey` VARCHAR(191) NULL,
+    ADD COLUMN `khaltiBaseUrl` VARCHAR(191) NULL,
+    ADD COLUMN `fonepayEnabled` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `fonepayLogo` VARCHAR(191) NULL,
+    ADD COLUMN `fonepayMerchantCode` VARCHAR(191) NULL,
+    ADD COLUMN `fonepaySecretKey` VARCHAR(191) NULL,
+    ADD COLUMN `fonepayCheckoutUrl` VARCHAR(191) NULL,
+    ADD COLUMN `fonepayVerificationUrl` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsEnabled` BOOLEAN NOT NULL DEFAULT false,
+    ADD COLUMN `connectipsLogo` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsMerchantId` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsAppId` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsAppName` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsPassword` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsPrivateKey` TEXT NULL,
+    ADD COLUMN `connectipsGatewayUrl` VARCHAR(191) NULL,
+    ADD COLUMN `connectipsValidationUrl` VARCHAR(191) NULL;

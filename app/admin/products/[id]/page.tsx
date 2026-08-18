@@ -70,6 +70,18 @@ export default function EditProductPage() {
           relatedIds: p.relatedIds ?? [],
           crossSellIds: p.crossSellIds ?? [],
           upSellIds: p.upSellIds ?? [],
+          hasDiscount: p.hasDiscount ?? false,
+          forCustomer: p.forCustomer ?? false,
+          customerDiscountPercent: numToStr(p.customerDiscountPercent),
+          forDistributor: p.forDistributor ?? false,
+          distributorDiscounts: (p.distributorDiscounts ?? []).map(
+            (r: { distributorId: number; discountPercent: number }) => ({
+              distributorId: r.distributorId,
+              discountPercent: numToStr(r.discountPercent),
+            })
+          ),
+          hasPointValue: p.hasPointValue ?? false,
+          pvDistributorIds: p.pvDistributorIds ?? [],
         });
       });
   }, [id]);

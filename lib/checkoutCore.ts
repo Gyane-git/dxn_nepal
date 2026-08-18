@@ -5,6 +5,13 @@ import { generateOrderNumber } from "@/lib/orderNumber";
 import { addressSchema } from "@/schemas/checkout";
 import { resolveShippingFee } from "@/lib/shipping";
 import { resolveTaxRate, computeTax } from "@/lib/tax";
+import {
+  computeAutoPv,
+  computeDiscountedUnitPrice,
+  isPvEligible,
+  selectDiscountPercent,
+  type PricingProductFlags,
+} from "@/lib/pricing";
 
 export interface ShippingSnapshot {
   fullName: string;
@@ -177,8 +184,148 @@ export async function loadValidatedCart(userId: number): Promise<ValidatedCart> 
   return cart;
 }
 
-export function computeSubtotal(cart: ValidatedCart): number {
-  return cart.items.reduce((sum, item) => sum + Number(item.variant?.price ?? item.product.price) * item.quantity, 0);
+export interface CartItemPricing {
+  unitPrice: number;
+  discountPercent: number | null;
+  pvPerUnit: number;
+}
+
+export { computeDiscountedUnitPrice };
+
+/**
+ * Pure selection rule, isolated from Prisma so it's directly unit-testable — see
+ * selectDiscountPercent/isPvEligible in lib/pricing.ts for the actual selection rule.
+ */
+export function selectItemPricing(
+  productId: number,
+  basePrice: number,
+  product: PricingProductFlags,
+  isDistributor: boolean,
+  distributorDiscounts: Map<number, number>,
+  distributorPvEligible: Set<number>
+): CartItemPricing {
+  const discountPercent = selectDiscountPercent(productId, product, isDistributor, distributorDiscounts);
+  const unitPrice = computeDiscountedUnitPrice(basePrice, discountPercent);
+  // PV is 0.2% of what the distributor actually pays — their own discounted price, not the list price.
+  const pvPerUnit = isPvEligible(productId, product, isDistributor, distributorPvEligible) ? computeAutoPv(unitPrice) : 0;
+
+  return {
+    unitPrice,
+    discountPercent,
+    pvPerUnit,
+  };
+}
+
+/**
+ * Resolves the per-cart-item unit price, discount%, and PV for the purchasing user, keyed by
+ * cartItem.id. See selectItemPricing for the actual selection rule.
+ */
+export async function resolveCartPricing(
+  cart: ValidatedCart,
+  user: { id: number; role: string }
+): Promise<Map<number, CartItemPricing>> {
+  const isDistributor = user.role === "DISTRIBUTOR";
+  const productIds = [...new Set(cart.items.map((item) => item.productId))];
+
+  const distributorDiscounts = new Map<number, number>();
+  const distributorPvEligible = new Set<number>();
+
+  if (isDistributor && productIds.length > 0) {
+    const [discountRules, pvRules] = await Promise.all([
+      prisma.productDistributorDiscount.findMany({
+        where: { distributorId: user.id, productId: { in: productIds } },
+      }),
+      prisma.productDistributorPv.findMany({
+        where: { distributorId: user.id, productId: { in: productIds } },
+        select: { productId: true },
+      }),
+    ]);
+    for (const rule of discountRules) distributorDiscounts.set(rule.productId, Number(rule.discountPercent));
+    for (const rule of pvRules) distributorPvEligible.add(rule.productId);
+  }
+
+  const pricing = new Map<number, CartItemPricing>();
+  for (const item of cart.items) {
+    const product = item.product;
+    const basePrice = Number(item.variant?.price ?? product.price);
+    pricing.set(
+      item.id,
+      selectItemPricing(
+        product.id,
+        basePrice,
+        {
+          hasDiscount: product.hasDiscount,
+          forCustomer: product.forCustomer,
+          customerDiscountPercent: product.customerDiscountPercent != null ? Number(product.customerDiscountPercent) : null,
+          forDistributor: product.forDistributor,
+          hasPointValue: product.hasPointValue,
+        },
+        isDistributor,
+        distributorDiscounts,
+        distributorPvEligible
+      )
+    );
+  }
+
+  return pricing;
+}
+
+export interface ViewerProductPricing {
+  discountPercent: number | null;
+  pvEligible: boolean;
+}
+
+/**
+ * Resolves, for a single viewer (or an anonymous/plain-customer visitor), the discount% and PV
+ * eligibility for a batch of products — used to show a distributor "your price"/"earn X PV" line
+ * on product cards and the product detail page, ahead of checkout. Only ever queries the DB for a
+ * DISTRIBUTOR viewer; a customer's discount (if any) comes straight from the already-loaded product
+ * flags. Never call this from a statically-cached/shared page — the result is viewer-specific.
+ */
+export async function resolveViewerProductPricing(
+  products: (PricingProductFlags & { id: number })[],
+  user: { id: number; role: string } | null
+): Promise<Map<number, ViewerProductPricing>> {
+  const isDistributor = user?.role === "DISTRIBUTOR";
+  const result = new Map<number, ViewerProductPricing>();
+
+  const distributorDiscounts = new Map<number, number>();
+  const distributorPvEligible = new Set<number>();
+
+  if (isDistributor && user && products.length > 0) {
+    const productIds = products.map((p) => p.id);
+    const [discountRules, pvRules] = await Promise.all([
+      prisma.productDistributorDiscount.findMany({
+        where: { distributorId: user.id, productId: { in: productIds } },
+      }),
+      prisma.productDistributorPv.findMany({
+        where: { distributorId: user.id, productId: { in: productIds } },
+        select: { productId: true },
+      }),
+    ]);
+    for (const rule of discountRules) distributorDiscounts.set(rule.productId, Number(rule.discountPercent));
+    for (const rule of pvRules) distributorPvEligible.add(rule.productId);
+  }
+
+  for (const product of products) {
+    // An anonymous (logged-out) visitor is neither a customer nor a distributor account —
+    // they get no personalized pricing at all, unlike an actual logged-in customer.
+    result.set(
+      product.id,
+      user
+        ? {
+            discountPercent: selectDiscountPercent(product.id, product, isDistributor, distributorDiscounts),
+            pvEligible: isPvEligible(product.id, product, isDistributor, distributorPvEligible),
+          }
+        : { discountPercent: null, pvEligible: false }
+    );
+  }
+
+  return result;
+}
+
+export function computeSubtotal(cart: ValidatedCart, pricing: Map<number, CartItemPricing>): number {
+  return cart.items.reduce((sum, item) => sum + pricing.get(item.id)!.unitPrice * item.quantity, 0);
 }
 
 export async function applyCoupon(subtotal: number, couponCode?: string | null) {
@@ -248,6 +395,7 @@ export async function createOrderFromCart(params: {
   userId: number;
   shipping: ShippingSnapshot;
   cart: ValidatedCart;
+  pricing: Map<number, CartItemPricing>;
   subtotal: number;
   discount: number;
   shippingFee: number;
@@ -262,6 +410,10 @@ export async function createOrderFromCart(params: {
 }) {
   const total = Math.max(0, params.subtotal - params.discount) + params.shippingFee + params.tax;
   const orderNumber = params.orderNumber ?? generateOrderNumber();
+  const totalPv = params.cart.items.reduce(
+    (sum, item) => sum + params.pricing.get(item.id)!.pvPerUnit * item.quantity,
+    0
+  );
 
   return prisma.$transaction(async (tx) => {
     const created = await tx.order.create({
@@ -289,16 +441,20 @@ export async function createOrderFromCart(params: {
         paymentStatus: params.paymentStatus,
         paymentReference: params.paymentReference ?? null,
         status: "PROCESSING",
+        totalPv,
         items: {
           create: params.cart.items.map((item) => {
             const label = variantLabel(item.variant);
+            const itemPricing = params.pricing.get(item.id)!;
             return {
               productId: item.productId,
               variantId: item.variantId,
               name: label ? `${item.product.name} (${label})` : item.product.name,
               image: item.variant?.image ?? item.product.images[0]?.url ?? null,
-              price: item.variant?.price ?? item.product.price,
+              price: itemPricing.unitPrice,
               quantity: item.quantity,
+              discountPercent: itemPricing.discountPercent,
+              pvEarned: itemPricing.pvPerUnit * item.quantity,
             };
           }),
         },

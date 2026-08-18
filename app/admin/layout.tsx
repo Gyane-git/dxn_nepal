@@ -43,6 +43,17 @@ const NAV_ITEMS = [
     icon: <path d="M12 3l2.6 5.4 5.9.8-4.3 4.2 1 5.9-5.2-2.8-5.2 2.8 1-5.9-4.3-4.2 5.9-.8L12 3z" />,
   },
   {
+    href: "/admin/distributors",
+    label: "Distributors",
+    icon: (
+      <>
+        <circle cx="8" cy="8" r="3" />
+        <circle cx="17" cy="9" r="2.5" />
+        <path d="M3 20c0-3 2.5-5 5-5s5 2 5 5M14.5 15.5c2.5 0 5.5 1.7 5.5 4.5" />
+      </>
+    ),
+  },
+  {
     href: "/admin/coupons",
     label: "Coupons",
     icon: <path d="M4 8a2 2 0 012-2h5.2a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-5.2 5.2a2 2 0 01-2.8 0l-6.4-6.4A2 2 0 014 13.2V8zm4.5 2a1 1 0 100-2 1 1 0 000 2z" />,

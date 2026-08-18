@@ -31,8 +31,14 @@ export async function GET(
       shippingFee: Number(order.shippingFee),
       tax: Number(order.tax),
       total: Number(order.total),
+      totalPv: Number(order.totalPv),
       coupon: order.coupon ? { ...order.coupon, value: Number(order.coupon.value) } : null,
-      items: order.items.map((item) => ({ ...item, price: Number(item.price) })),
+      items: order.items.map((item) => ({
+        ...item,
+        price: Number(item.price),
+        discountPercent: item.discountPercent ? Number(item.discountPercent) : null,
+        pvEarned: Number(item.pvEarned),
+      })),
     };
 
     return ok(data);

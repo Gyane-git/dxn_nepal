@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { forgotPasswordSchema } from "@/schemas/auth";
 import { sendMailBestEffort, passwordResetEmail } from "@/lib/mail";
+import { OTP_EXPIRY_MS } from "@/lib/otp";
 
 const GENERIC_MESSAGE = "If an account exists for that email, we've sent a password reset link.";
 
@@ -19,7 +20,7 @@ export async function POST(request: Request) {
   if (user) {
     const rawToken = crypto.randomBytes(32).toString("hex");
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + OTP_EXPIRY_MS);
 
     await prisma.passwordResetToken.deleteMany({ where: { userId: user.id } });
     await prisma.passwordResetToken.create({ data: { userId: user.id, tokenHash, expiresAt } });

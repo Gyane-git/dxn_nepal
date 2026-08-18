@@ -6,6 +6,7 @@ import { parsePagination } from "@/lib/admin-query";
 import { ensureUniqueSlug } from "@/lib/slug";
 import { generateSku } from "@/lib/sku";
 import { syncRelations } from "@/lib/product-relations";
+import { syncDistributorDiscounts, syncDistributorPv } from "@/lib/product-distributor-rules";
 import { productSchema } from "@/schemas/admin-product";
 
 export async function GET(request: Request) {
@@ -116,13 +117,21 @@ export async function POST(request: Request) {
           colorway: data.colorway,
           status: data.status,
           publishedAt: data.status === "PUBLISHED" ? new Date() : null,
+          hasDiscount: data.hasDiscount,
+          forCustomer: data.hasDiscount && data.forCustomer,
+          customerDiscountPercent: data.hasDiscount && data.forCustomer ? data.customerDiscountPercent : null,
+          forDistributor: data.hasDiscount && data.forDistributor,
+          hasPointValue: data.hasPointValue,
           images: {
             create: data.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: img.sortOrder ?? i })),
           },
         },
       });
 
+      const distributorDiscounts = data.hasDiscount && data.forDistributor ? data.distributorDiscounts : [];
       await syncRelations(tx, created.id, data.relatedIds, data.crossSellIds, data.upSellIds);
+      await syncDistributorDiscounts(tx, created.id, distributorDiscounts);
+      await syncDistributorPv(tx, created.id, data.hasPointValue ? data.pvDistributorIds : [], data.price, distributorDiscounts);
       return created;
     });
 

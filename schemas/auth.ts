@@ -1,21 +1,27 @@
 import { z } from "zod";
 
-export const registerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters").max(80),
-  email: z.string().email("Enter a valid email address"),
-  phone: z
-    .string()
-    .min(7, "Enter a valid phone number")
-    .max(20)
-    .optional()
-    .or(z.literal("")),
-  password: z.string().min(6, "Password must be at least 6 characters").max(72),
-});
+export const registerSchema = z
+  .object({
+    name: z.string().min(2, "Name must be at least 2 characters").max(80),
+    email: z.string().email("Enter a valid email address"),
+    phone: z
+      .string()
+      .min(7, "Enter a valid phone number")
+      .max(20)
+      .optional()
+      .or(z.literal("")),
+    password: z.string().min(6, "Password must be at least 6 characters").max(72),
+    confirmPassword: z.string().min(1, "Please confirm your password"),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 
 export const loginSchema = z.object({
-  email: z.string().email("Enter a valid email address"),
+  email: z.string().min(3, "Enter your email or Distributor ID"),
   password: z.string().min(1, "Password is required"),
 });
 
@@ -33,6 +39,19 @@ export const resetPasswordSchema = z.object({
 });
 
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+
+export const verifyOtpSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+  code: z.string().length(6, "Enter the 6-digit code"),
+});
+
+export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+
+export const resendOtpSchema = z.object({
+  email: z.string().email("Enter a valid email address"),
+});
+
+export type ResendOtpInput = z.infer<typeof resendOtpSchema>;
 
 export const updateProfileSchema = z.object({
   name: z.string().min(2, "Name must be at least 2 characters").max(80),
