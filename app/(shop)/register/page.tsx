@@ -41,14 +41,34 @@ export default function RegisterPage() {
   return (
     <div className="mx-auto flex min-h-[70vh] max-w-md flex-col justify-center px-4 py-12">
       <Logo showText={false} iconSize={48} className="mx-auto" />
-      <h1 className="mt-4 text-center text-2xl font-bold tracking-tight text-gray-900">Create your account</h1>
-      <p className="mt-2 text-center text-sm text-gray-500">Join DXN for a healthier everyday</p>
+      <h1 className="mt-4 text-center text-2xl font-bold tracking-tight text-gray-900">
+        Create your account
+      </h1>
+      <p className="mt-2 text-center text-sm text-gray-500">
+        Join DXN for a healthier everyday
+      </p>
 
       <div className="mt-8 rounded-2xl border border-gray-200 bg-white p-6 shadow-soft">
         <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
-          <Input label="Full Name" autoComplete="name" error={errors.name?.message} {...register("name")} />
-          <Input label="Email" type="email" autoComplete="email" error={errors.email?.message} {...register("email")} />
-          <Input label="Phone (optional)" autoComplete="tel" error={errors.phone?.message} {...register("phone")} />
+          <Input
+            label="Full Name"
+            autoComplete="name"
+            error={errors.name?.message}
+            {...register("name")}
+          />
+          <Input
+            label="Email"
+            type="email"
+            autoComplete="email"
+            error={errors.email?.message}
+            {...register("email")}
+          />
+          <Input
+            label="Phone (optional)"
+            autoComplete="tel"
+            error={errors.phone?.message}
+            {...register("phone")}
+          />
           <Input
             label="Password"
             type="password"
@@ -72,7 +92,10 @@ export default function RegisterPage() {
 
       <p className="mt-6 text-center text-sm text-gray-500">
         Already have an account?{" "}
-        <Link href="/login" className="font-medium text-primary-600 hover:underline">
+        <Link
+          href="/login"
+          className="font-medium text-primary-600 hover:underline"
+        >
           Log in
         </Link>
       </p>

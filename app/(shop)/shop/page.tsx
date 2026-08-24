@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { ProductCard } from "@/components/product/ProductCard";
+import { FilterSidebar } from "@/components/shop/FilterSidebar";
 import { getCurrentUser } from "@/lib/session";
 import { resolveViewerProductPricing } from "@/lib/checkoutCore";
 import { computeDiscountedUnitPrice, computeAutoPv } from "@/lib/pricing";
@@ -8,7 +9,10 @@ import type { Prisma } from "@prisma/client";
 
 const PAGE_SIZE = 12;
 
-const SORT_OPTIONS: Record<string, { label: string; orderBy: Prisma.ProductOrderByWithRelationInput }> = {
+const SORT_OPTIONS: Record<
+  string,
+  { label: string; orderBy: Prisma.ProductOrderByWithRelationInput }
+> = {
   featured: { label: "Featured", orderBy: { createdAt: "asc" } },
   newest: { label: "Newest", orderBy: { createdAt: "desc" } },
   "price-asc": { label: "Price: Low to High", orderBy: { price: "asc" } },
@@ -38,7 +42,18 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
   const maxPrice = params.maxPrice ? Number(params.maxPrice) : undefined;
   const color = params.color;
   const minRating = params.rating ? Number(params.rating) : undefined;
-  const sortKey = params.sort && SORT_OPTIONS[params.sort] ? params.sort : "featured";
+
+  const activeFilterCount = [
+    category,
+    brand,
+    color,
+    params.minPrice,
+    params.maxPrice,
+    params.rating,
+  ].filter(Boolean).length;
+
+  const sortKey =
+    params.sort && SORT_OPTIONS[params.sort] ? params.sort : "featured";
   const page = Math.max(1, Number(params.page) || 1);
 
   const where: Prisma.ProductWhereInput = {
@@ -48,53 +63,94 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
     ...(category ? { category: { slug: category } } : {}),
     ...(brand ? { brand: { slug: brand } } : {}),
     ...(color
-      ? { variants: { some: { status: "ACTIVE", deletedAt: null, attributeValues: { some: { attributeValue: { slug: color } } } } } }
+      ? {
+          variants: {
+            some: {
+              status: "ACTIVE",
+              deletedAt: null,
+              attributeValues: { some: { attributeValue: { slug: color } } },
+            },
+          },
+        }
       : {}),
     ...(minPrice !== undefined || maxPrice !== undefined
-      ? { price: { ...(minPrice !== undefined ? { gte: minPrice } : {}), ...(maxPrice !== undefined ? { lte: maxPrice } : {}) } }
+      ? {
+          price: {
+            ...(minPrice !== undefined ? { gte: minPrice } : {}),
+            ...(maxPrice !== undefined ? { lte: maxPrice } : {}),
+          },
+        }
       : {}),
   };
 
-  const [categories, brands, allMatching, availableColorValues, activeBrand] = await Promise.all([
-    prisma.category.findMany({
-      where: { status: "ACTIVE", deletedAt: null },
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { products: { where: { status: "PUBLISHED", deletedAt: null } } } },
-      },
-    }),
-    prisma.brand.findMany({
-      where: { status: "ACTIVE", deletedAt: null },
-      orderBy: { name: "asc" },
-      include: {
-        _count: { select: { products: { where: { status: "PUBLISHED", deletedAt: null } } } },
-      },
-    }),
-    prisma.product.findMany({
-      where,
-      orderBy: SORT_OPTIONS[sortKey].orderBy,
-      include: { category: true, images: { take: 1 }, reviews: { select: { rating: true } } },
-    }),
-    prisma.attributeValue.findMany({
-      where: {
-        attribute: { type: "COLOR" },
-        variantValues: {
-          some: { variant: { status: "ACTIVE", deletedAt: null, product: { status: "PUBLISHED", deletedAt: null } } },
+  const [categories, brands, allMatching, availableColorValues, activeBrand] =
+    await Promise.all([
+      prisma.category.findMany({
+        where: { status: "ACTIVE", deletedAt: null },
+        orderBy: { name: "asc" },
+        include: {
+          _count: {
+            select: {
+              products: { where: { status: "PUBLISHED", deletedAt: null } },
+            },
+          },
         },
-      },
-      select: { value: true, slug: true, colorHex: true },
-      distinct: ["value"],
-      orderBy: { sortOrder: "asc" },
-    }),
-    brand ? prisma.brand.findUnique({ where: { slug: brand }, select: { name: true } }) : null,
-  ]);
+      }),
+      prisma.brand.findMany({
+        where: { status: "ACTIVE", deletedAt: null },
+        orderBy: { name: "asc" },
+        include: {
+          _count: {
+            select: {
+              products: { where: { status: "PUBLISHED", deletedAt: null } },
+            },
+          },
+        },
+      }),
+      prisma.product.findMany({
+        where,
+        orderBy: SORT_OPTIONS[sortKey].orderBy,
+        include: {
+          category: true,
+          images: { take: 1 },
+          reviews: { select: { rating: true } },
+        },
+      }),
+      prisma.attributeValue.findMany({
+        where: {
+          attribute: { type: "COLOR" },
+          variantValues: {
+            some: {
+              variant: {
+                status: "ACTIVE",
+                deletedAt: null,
+                product: { status: "PUBLISHED", deletedAt: null },
+              },
+            },
+          },
+        },
+        select: { value: true, slug: true, colorHex: true },
+        distinct: ["value"],
+        orderBy: { sortOrder: "asc" },
+      }),
+      brand
+        ? prisma.brand.findUnique({
+            where: { slug: brand },
+            select: { name: true },
+          })
+        : null,
+    ]);
 
   const withRatings = allMatching.map((p) => ({
     ...p,
-    avgRating: p.reviews.length ? p.reviews.reduce((s, r) => s + r.rating, 0) / p.reviews.length : 0,
+    avgRating: p.reviews.length
+      ? p.reviews.reduce((s, r) => s + r.rating, 0) / p.reviews.length
+      : 0,
   }));
 
-  const filtered = minRating ? withRatings.filter((p) => p.avgRating >= minRating) : withRatings;
+  const filtered = minRating
+    ? withRatings.filter((p) => p.avgRating >= minRating)
+    : withRatings;
   const total = filtered.length;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const products = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -105,11 +161,14 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
       id: p.id,
       hasDiscount: p.hasDiscount,
       forCustomer: p.forCustomer,
-      customerDiscountPercent: p.customerDiscountPercent != null ? Number(p.customerDiscountPercent) : null,
+      customerDiscountPercent:
+        p.customerDiscountPercent != null
+          ? Number(p.customerDiscountPercent)
+          : null,
       forDistributor: p.forDistributor,
       hasPointValue: p.hasPointValue,
     })),
-    viewer
+    viewer,
   );
 
   function withParams(overrides: Record<string, string | undefined>) {
@@ -138,22 +197,29 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
         {search
           ? `Search results for "${search}"`
           : category
-            ? categories.find((c) => c.slug === category)?.name ?? "Shop"
+            ? (categories.find((c) => c.slug === category)?.name ?? "Shop")
             : activeBrand
               ? activeBrand.name
               : "All Products"}
       </h1>
 
       <div className="mt-8 flex flex-col gap-8 lg:flex-row">
-        <aside className="w-full shrink-0 lg:w-64">
+        <FilterSidebar>
+          {/* Categories */}
           <div className="rounded-2xl border border-gray-200 bg-white p-5 shadow-soft">
             <h2 className="text-sm font-semibold text-gray-900">Categories</h2>
+
             <ul className="mt-3 space-y-1 text-sm">
               <li>
                 <Link
-                  href={withParams({ category: undefined, page: undefined })}
+                  href={withParams({
+                    category: undefined,
+                    page: undefined,
+                  })}
                   className={`flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
-                    !category ? "bg-primary-50 font-semibold text-primary-700" : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
+                    !category
+                      ? "bg-primary-50 font-semibold text-primary-700"
+                      : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
                   }`}
                 >
                   All Products
@@ -162,31 +228,47 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                   </span>
                 </Link>
               </li>
+
               {categories.map((c) => (
                 <li key={c.id}>
                   <Link
-                    href={withParams({ category: c.slug, page: undefined })}
+                    href={withParams({
+                      category: c.slug,
+                      page: undefined,
+                    })}
                     className={`flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
-                      category === c.slug ? "bg-primary-50 font-semibold text-primary-700" : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
+                      category === c.slug
+                        ? "bg-primary-50 font-semibold text-primary-700"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
                     }`}
                   >
                     {c.name}
-                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{c._count.products}</span>
+
+                    <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                      {c._count.products}
+                    </span>
                   </Link>
                 </li>
               ))}
             </ul>
           </div>
 
+          {/* Brands */}
           {brands.length > 0 && (
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft">
               <h2 className="text-sm font-semibold text-gray-900">Brands</h2>
+
               <ul className="mt-3 space-y-1 text-sm">
                 <li>
                   <Link
-                    href={withParams({ brand: undefined, page: undefined })}
+                    href={withParams({
+                      brand: undefined,
+                      page: undefined,
+                    })}
                     className={`flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
-                      !brand ? "bg-primary-50 font-semibold text-primary-700" : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
+                      !brand
+                        ? "bg-primary-50 font-semibold text-primary-700"
+                        : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
                     }`}
                   >
                     All Brands
@@ -195,16 +277,25 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                     </span>
                   </Link>
                 </li>
+
                 {brands.map((b) => (
                   <li key={b.id}>
                     <Link
-                      href={withParams({ brand: b.slug, page: undefined })}
+                      href={withParams({
+                        brand: b.slug,
+                        page: undefined,
+                      })}
                       className={`flex items-center justify-between rounded-lg px-2 py-1.5 transition-colors ${
-                        brand === b.slug ? "bg-primary-50 font-semibold text-primary-700" : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
+                        brand === b.slug
+                          ? "bg-primary-50 font-semibold text-primary-700"
+                          : "text-gray-600 hover:bg-gray-50 hover:text-primary-600"
                       }`}
                     >
                       {b.name}
-                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">{b._count.products}</span>
+
+                      <span className="rounded-full bg-gray-100 px-2 py-0.5 text-xs text-gray-500">
+                        {b._count.products}
+                      </span>
                     </Link>
                   </li>
                 ))}
@@ -212,41 +303,71 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             </div>
           )}
 
+          {/* Colors */}
           {availableColorValues.length > 0 && (
             <div className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft">
               <h2 className="flex items-center justify-between text-sm font-semibold text-gray-900">
                 Color
                 {color && (
-                  <Link href={withParams({ color: undefined, page: undefined })} className="text-xs font-normal text-gray-400 hover:text-primary-600">
+                  <Link
+                    href={withParams({
+                      color: undefined,
+                      page: undefined,
+                    })}
+                    className="text-xs font-normal text-gray-400 hover:text-primary-600"
+                  >
                     Clear
                   </Link>
                 )}
               </h2>
+
               <div className="mt-3 flex flex-wrap gap-3">
                 {availableColorValues.map((v) => (
                   <Link
                     key={v.slug}
-                    href={withParams({ color: color === v.slug ? undefined : v.slug, page: undefined })}
+                    href={withParams({
+                      color: color === v.slug ? undefined : v.slug,
+                      page: undefined,
+                    })}
                     title={v.value}
                     aria-label={`Filter by ${v.value}`}
                     aria-current={color === v.slug}
                     className={`flex h-8 w-8 items-center justify-center rounded-full ring-2 ring-offset-2 transition-shadow ${
-                      color === v.slug ? "ring-primary-500" : "ring-transparent hover:ring-gray-200"
+                      color === v.slug
+                        ? "ring-primary-500"
+                        : "ring-transparent hover:ring-gray-200"
                     }`}
                   >
-                    <span className="h-6 w-6 rounded-full border border-black/10" style={{ backgroundColor: v.colorHex ?? "#d1d5db" }} />
+                    <span
+                      className="h-6 w-6 rounded-full border border-black/10"
+                      style={{
+                        backgroundColor: v.colorHex ?? "#d1d5db",
+                      }}
+                    />
                   </Link>
                 ))}
               </div>
             </div>
           )}
 
-          <form action="/shop" method="get" className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft">
+          {/* Price + Rating */}
+          <form
+            action="/shop"
+            method="get"
+            className="mt-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-soft"
+          >
             <h2 className="text-sm font-semibold text-gray-900">Price Range</h2>
+
             {color && <input type="hidden" name="color" value={color} />}
-            {category && <input type="hidden" name="category" value={category} />}
+
+            {category && (
+              <input type="hidden" name="category" value={category} />
+            )}
+
             {brand && <input type="hidden" name="brand" value={brand} />}
+
             {search && <input type="hidden" name="search" value={search} />}
+
             <div className="mt-3 flex items-center gap-2">
               <input
                 type="number"
@@ -255,7 +376,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                 defaultValue={params.minPrice}
                 className="w-1/2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none placeholder:text-gray-400 focus:border-primary-400 focus:ring-2 focus:ring-primary-100"
               />
+
               <span className="text-gray-400">–</span>
+
               <input
                 type="number"
                 name="maxPrice"
@@ -266,6 +389,7 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
             </div>
 
             <h2 className="mt-5 text-sm font-semibold text-gray-900">Rating</h2>
+
             <select
               name="rating"
               defaultValue={params.rating ?? ""}
@@ -285,17 +409,22 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               Apply Filters
             </button>
           </form>
-        </aside>
+        </FilterSidebar>
 
         <div className="flex-1">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-gray-500">{total} product{total === 1 ? "" : "s"} found</p>
+            <p className="text-sm text-gray-500">
+              {total} product{total === 1 ? "" : "s"} found
+            </p>
             <div className="flex items-center gap-2 text-sm">
               <span className="text-gray-500">Sort:</span>
               {Object.entries(SORT_OPTIONS).map(([key, opt]) => (
                 <Link
                   key={key}
-                  href={withParams({ sort: key === "featured" ? undefined : key, page: undefined })}
+                  href={withParams({
+                    sort: key === "featured" ? undefined : key,
+                    page: undefined,
+                  })}
                   className={`rounded-full px-3 py-1.5 transition-colors ${sortKey === key ? "bg-primary-500 text-white" : "bg-gray-100 text-gray-600 hover:bg-gray-200"}`}
                 >
                   {opt.label}
@@ -306,7 +435,13 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
 
           {products.length === 0 ? (
             <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-gray-200 bg-white p-16 text-center text-gray-500">
-              <svg viewBox="0 0 24 24" className="h-10 w-10 text-gray-300" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <svg
+                viewBox="0 0 24 24"
+                className="h-10 w-10 text-gray-300"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={1.5}
+              >
                 <circle cx="11" cy="11" r="7" />
                 <path d="M21 21l-4.3-4.3" />
               </svg>
@@ -317,7 +452,10 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
               {products.map((p) => {
                 const price = Number(p.price);
                 const vp = viewerPricing.get(p.id);
-                const distributorPrice = vp?.discountPercent != null ? computeDiscountedUnitPrice(price, vp.discountPercent) : null;
+                const distributorPrice =
+                  vp?.discountPercent != null
+                    ? computeDiscountedUnitPrice(price, vp.discountPercent)
+                    : null;
                 return (
                   <ProductCard
                     key={p.id}
@@ -328,7 +466,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                       name: p.name,
                       slug: p.slug,
                       price,
-                      compareAtPrice: p.compareAtPrice ? Number(p.compareAtPrice) : null,
+                      compareAtPrice: p.compareAtPrice
+                        ? Number(p.compareAtPrice)
+                        : null,
                       colorway: p.colorway,
                       stock: p.stock,
                       image: p.images[0]?.url ?? null,
@@ -337,7 +477,9 @@ export default async function ShopPage({ searchParams }: ShopPageProps) {
                       reviewCount: p.reviews.length,
                       distributorPrice,
                       // PV is 0.2% of the distributor's own discounted price (falls back to list price if no discount applies).
-                      distributorPv: vp?.pvEligible ? computeAutoPv(distributorPrice ?? price) : 0,
+                      distributorPv: vp?.pvEligible
+                        ? computeAutoPv(distributorPrice ?? price)
+                        : 0,
                     }}
                   />
                 );
