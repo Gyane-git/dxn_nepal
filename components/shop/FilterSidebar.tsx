@@ -7,7 +7,10 @@ interface FilterSidebarProps {
   activeCount?: number;
 }
 
-export function FilterSidebar({ children, activeCount = 0 }: FilterSidebarProps) {
+export function FilterSidebar({
+  children,
+  activeCount = 0,
+}: FilterSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -21,7 +24,13 @@ export function FilterSidebar({ children, activeCount = 0 }: FilterSidebarProps)
         className="flex w-full items-center justify-between rounded-2xl border border-gray-200 bg-white px-5 py-3 text-sm font-semibold text-gray-900 shadow-soft lg:hidden"
       >
         <span className="flex items-center gap-2">
-          <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={1.5}>
+          <svg
+            viewBox="0 0 24 24"
+            className="h-4 w-4"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
             <path d="M4 6h16M7 12h10M10 18h4" strokeLinecap="round" />
           </svg>
           Filters
@@ -43,7 +52,10 @@ export function FilterSidebar({ children, activeCount = 0 }: FilterSidebarProps)
       </button>
 
       {/* Filter panel: collapsible below lg, always visible from lg up */}
-      <div id="shop-filters-panel" className={`${open ? "mt-4 block" : "hidden"} lg:mt-0 lg:!block`}>
+      <div
+        id="shop-filters-panel"
+        className={`${open ? "mt-4 block" : "hidden"} lg:mt-0 lg:block!`}
+      >
         {children}
       </div>
     </aside>
