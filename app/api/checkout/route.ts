@@ -6,12 +6,13 @@ import { renderInvoicePdf } from "@/lib/invoice";
 import {
   applyCoupon,
   computeSubtotal,
-  computeShippingAndTax,
   createOrderFromCart,
   loadValidatedCart,
+  parseSelectedItems,
   resolveCartPricing,
   resolveShippingAddress,
 } from "@/lib/checkoutCore";
+import { computeShippingTaxAndDealer, notifyDealerOfOrder } from "@/lib/dealerCheckout";
 import { getPaymentSettings } from "@/lib/settings";
 
 /** Cash on Delivery checkout — payment happens on delivery, so the order is committed immediately. */
@@ -25,7 +26,7 @@ export async function POST(request: Request) {
     }
 
     const shipping = await resolveShippingAddress(user, body);
-    const cart = await loadValidatedCart(user.id);
+    const cart = await loadValidatedCart(user.id, parseSelectedItems(body));
     const pricing = await resolveCartPricing(cart, user);
     const subtotal = computeSubtotal(cart, pricing);
 
@@ -39,7 +40,17 @@ export async function POST(request: Request) {
     }
 
     const { discount, couponId } = await applyCoupon(subtotal, body.couponCode);
-    const { shippingFee, tax, taxLabel } = await computeShippingAndTax(shipping.country, subtotal, discount, shipping.municipalityId);
+
+    // Dealer routing only activates where dealers actually exist (Kathmandu wards, initially) —
+    // everywhere else checkout behaves exactly as it did before dealers existed. Throws if a
+    // dealer is required but missing/invalid/no-longer-fulfillable.
+    const { shippingFee, tax, taxLabel, dealer } = await computeShippingTaxAndDealer(
+      shipping,
+      subtotal,
+      discount,
+      cart,
+      body.dealerId
+    );
 
     const order = await createOrderFromCart({
       userId: user.id,
@@ -56,9 +67,17 @@ export async function POST(request: Request) {
       paymentSubMethod: null,
       paymentStatus: "PENDING",
       historyNote: "Order placed",
+      dealer,
     });
 
-    await notify(user.id, `Your order ${order.orderNumber} has been placed and is now Processing.`);
+    await notify(user.id, `Your order ${order.orderNumber} has been placed and is now Processing.`, {
+      type: "order",
+      link: "/account/orders",
+    });
+
+    if (dealer) {
+      await notifyDealerOfOrder(dealer.id, order.orderNumber);
+    }
 
     const items = cart.items.map((item) => ({
       name: item.product.name,

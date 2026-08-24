@@ -54,6 +54,17 @@ const NAV_ITEMS = [
     ),
   },
   {
+    href: "/admin/dealers",
+    label: "Dealers",
+    icon: (
+      <>
+        <path d="M3 10l9-6 9 6" />
+        <path d="M5 10v9h14v-9" />
+        <path d="M9 19v-5h6v5" />
+      </>
+    ),
+  },
+  {
     href: "/admin/coupons",
     label: "Coupons",
     icon: <path d="M4 8a2 2 0 012-2h5.2a2 2 0 011.4.6l6.4 6.4a2 2 0 010 2.8l-5.2 5.2a2 2 0 01-2.8 0l-6.4-6.4A2 2 0 014 13.2V8zm4.5 2a1 1 0 100-2 1 1 0 000 2z" />,

@@ -9,8 +9,20 @@ import { formatPrice } from "@/lib/format";
 import { useToast } from "@/context/ToastContext";
 
 export default function CartPage() {
-  const { lines, isLoading, subtotal, updateQuantity, removeItem } = useCart();
+  const {
+    lines,
+    isLoading,
+    updateQuantity,
+    removeItem,
+    isSelected,
+    toggleSelected,
+    selectAll,
+    clearSelection,
+    selectedSubtotal,
+    selectedCount,
+  } = useCart();
   const showToast = useToast();
+  const allSelected = lines.length > 0 && lines.every((l) => isSelected(l.productId, l.variantId));
 
   async function handleQuantityChange(productId: string, quantity: number, variantId: number | null) {
     try {
@@ -41,83 +53,111 @@ export default function CartPage() {
       <h1 className="text-3xl font-bold tracking-tight text-gray-900">Shopping Cart</h1>
 
       <div className="mt-8 flex flex-col gap-8 lg:flex-row">
-        <div className="flex-1 divide-y divide-gray-100 rounded-2xl border border-gray-200 bg-white p-2 shadow-soft">
-          {lines.map((line) => (
-            <div key={`${line.productId}-${line.variantId ?? "base"}`} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4">
-              <div className="flex items-center gap-4">
-                <Link href={`/product/${line.slug}`} className="shrink-0 w-20">
-                  <ProductImage src={line.image} alt={line.name} colorway={line.colorway} />
-                </Link>
-                <div className="min-w-0 flex-1 sm:hidden">
-                  <Link href={`/product/${line.slug}`} className="font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
-                    {line.name}
-                  </Link>
-                  {line.variantLabel && <p className="text-xs text-gray-500">{line.variantLabel}</p>}
-                  <p className="mt-1 text-sm text-gray-500">{formatPrice(line.price)}</p>
+        <div className="flex-1 rounded-2xl border border-gray-200 bg-white p-2 shadow-soft">
+          <label className="flex cursor-pointer items-center gap-3 border-b border-gray-100 px-3 py-2.5 text-sm font-medium text-gray-700">
+            <input
+              type="checkbox"
+              checked={allSelected}
+              onChange={() => (allSelected ? clearSelection() : selectAll())}
+              className="h-4 w-4 rounded border-gray-300 accent-primary-600"
+            />
+            Select all
+          </label>
+
+          <div className="divide-y divide-gray-100">
+            {lines.map((line) => {
+              const checked = isSelected(line.productId, line.variantId);
+              return (
+                <div key={`${line.productId}-${line.variantId ?? "base"}`} className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:gap-4">
+                  <div className="flex items-center gap-4">
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={() => toggleSelected(line.productId, line.variantId)}
+                      className="h-4 w-4 shrink-0 rounded border-gray-300 accent-primary-600"
+                      aria-label={`Select ${line.name}`}
+                    />
+                    <Link href={`/product/${line.slug}`} className="shrink-0 w-20">
+                      <ProductImage src={line.image} alt={line.name} colorway={line.colorway} />
+                    </Link>
+                    <div className="min-w-0 flex-1 sm:hidden">
+                      <Link href={`/product/${line.slug}`} className="font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
+                        {line.name}
+                      </Link>
+                      {line.variantLabel && <p className="text-xs text-gray-500">{line.variantLabel}</p>}
+                      <p className="mt-1 text-sm text-gray-500">{formatPrice(line.price)}</p>
+                    </div>
+                  </div>
+
+                  <div className="hidden min-w-0 flex-1 sm:block">
+                    <Link href={`/product/${line.slug}`} className="font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
+                      {line.name}
+                    </Link>
+                    {line.variantLabel && <p className="text-xs text-gray-500">{line.variantLabel}</p>}
+                    <p className="mt-1 text-sm text-gray-500">{formatPrice(line.price)}</p>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 sm:shrink-0">
+                    <div className="flex items-center rounded-full border border-gray-200">
+                      <button
+                        onClick={() => handleQuantityChange(line.productId, line.quantity - 1, line.variantId)}
+                        className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
+                        aria-label="Decrease quantity"
+                      >
+                        −
+                      </button>
+                      <span className="w-8 text-center text-sm">{line.quantity}</span>
+                      <button
+                        onClick={() => {
+                          if (line.quantity >= line.stock) {
+                            showToast(`Only ${line.stock} in stock`, "error");
+                            return;
+                          }
+                          handleQuantityChange(line.productId, line.quantity + 1, line.variantId);
+                        }}
+                        className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
+                        aria-label="Increase quantity"
+                      >
+                        +
+                      </button>
+                    </div>
+
+                    <p className="w-24 shrink-0 text-right font-semibold text-primary-700">
+                      {formatPrice(line.price * line.quantity)}
+                    </p>
+
+                    <button
+                      onClick={() => removeItem(line.productId, line.variantId)}
+                      aria-label="Remove item"
+                      className="shrink-0 rounded-full p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    >
+                      <Trash2 className="h-5 w-5" strokeWidth={1.6} />
+                    </button>
+                  </div>
                 </div>
-              </div>
-
-              <div className="hidden min-w-0 flex-1 sm:block">
-                <Link href={`/product/${line.slug}`} className="font-medium text-gray-900 hover:text-primary-600 line-clamp-2">
-                  {line.name}
-                </Link>
-                {line.variantLabel && <p className="text-xs text-gray-500">{line.variantLabel}</p>}
-                <p className="mt-1 text-sm text-gray-500">{formatPrice(line.price)}</p>
-              </div>
-
-              <div className="flex items-center justify-between gap-3 sm:shrink-0">
-                <div className="flex items-center rounded-full border border-gray-200">
-                  <button
-                    onClick={() => handleQuantityChange(line.productId, line.quantity - 1, line.variantId)}
-                    className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
-                    aria-label="Decrease quantity"
-                  >
-                    −
-                  </button>
-                  <span className="w-8 text-center text-sm">{line.quantity}</span>
-                  <button
-                    onClick={() => {
-                      if (line.quantity >= line.stock) {
-                        showToast(`Only ${line.stock} in stock`, "error");
-                        return;
-                      }
-                      handleQuantityChange(line.productId, line.quantity + 1, line.variantId);
-                    }}
-                    className="px-3 py-1.5 text-gray-600 transition-colors hover:bg-gray-50"
-                    aria-label="Increase quantity"
-                  >
-                    +
-                  </button>
-                </div>
-
-                <p className="w-24 shrink-0 text-right font-semibold text-primary-700">
-                  {formatPrice(line.price * line.quantity)}
-                </p>
-
-                <button
-                  onClick={() => removeItem(line.productId, line.variantId)}
-                  aria-label="Remove item"
-                  className="shrink-0 rounded-full p-2 text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                >
-                  <Trash2 className="h-5 w-5" strokeWidth={1.6} />
-                </button>
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
 
         <div className="w-full shrink-0 self-start rounded-2xl border border-gray-200 bg-white p-6 shadow-soft lg:w-80">
           <h2 className="text-sm font-semibold text-gray-900">Order Summary</h2>
           <div className="mt-4 flex justify-between text-sm text-gray-600">
-            <span>Subtotal</span>
-            <span>{formatPrice(subtotal)}</span>
+            <span>Subtotal ({selectedCount} {selectedCount === 1 ? "item" : "items"})</span>
+            <span>{formatPrice(selectedSubtotal)}</span>
           </div>
           <p className="mt-1 text-xs text-gray-400">Shipping and coupons calculated at checkout.</p>
-          <Link href="/checkout" className="mt-5 block">
-            <Button className="w-full" size="lg">
-              Proceed to Checkout
+          {selectedCount === 0 ? (
+            <Button className="mt-5 w-full" size="lg" disabled>
+              Select an item to continue
             </Button>
-          </Link>
+          ) : (
+            <Link href="/checkout" className="mt-5 block">
+              <Button className="w-full" size="lg">
+                Proceed to Checkout
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
     </div>

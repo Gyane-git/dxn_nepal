@@ -21,6 +21,7 @@ enum DistributorApplicationStatus {
   PENDING
   APPROVED
   REJECTED
+  CANCELLED
 }
 
 enum PaymentMethod {
@@ -130,8 +131,11 @@ model User {
   emailOtps               EmailOtp[]
   distributorApplications DistributorApplication[]     @relation("Applicant")
   reviewedApplications    DistributorApplication[]     @relation("ApplicationReviewer")
+  sponsoredApplications   DistributorApplication[]     @relation("Sponsor")
   distributorDiscounts    ProductDistributorDiscount[]
   distributorPvRules      ProductDistributorPv[]
+  dealer                  Dealer?
+  auditLogs               AuditLog[]
 
   @@map("user")
 }
@@ -141,6 +145,8 @@ model DistributorApplication {
   userId          Int
   fullName        String
   phone           String?
+  email           String?
+  alternatePhone  String?
   reason          String?                      @db.Text
   status          DistributorApplicationStatus @default(PENDING)
   distributorId   String?
@@ -150,11 +156,42 @@ model DistributorApplication {
   createdAt       DateTime                     @default(now())
   updatedAt       DateTime                     @updatedAt
 
-  user       User  @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
-  reviewedBy User? @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+  // Address (optional — legacy applications predate these fields)
+  provinceId     Int?
+  districtId     Int?
+  municipalityId Int?
+  wardId         Int?
+  toleArea       String?
+  fullAddress    String?
+  landmark       String?
+
+  // Business information
+  businessName          String?
+  businessType          String?
+  panVatNumber          String?
+  registrationNumber    String?
+  businessAddress       String?
+  businessPhone         String?
+  businessEmail         String?
+  yearsInBusiness       Int?
+  estimatedMonthlySales Decimal? @db.Decimal(12, 2)
+  numberOfEmployees     Int?
+
+  // Sponsor — must reference an existing, active Distributor; never free text (see lib/sponsor.ts)
+  sponsorDistributorId Int?
+
+  user         User         @relation("Applicant", fields: [userId], references: [id], onDelete: Cascade)
+  reviewedBy   User?        @relation("ApplicationReviewer", fields: [reviewedById], references: [id])
+  sponsor      User?        @relation("Sponsor", fields: [sponsorDistributorId], references: [id])
+  province     AddressBook? @relation("ApplicationProvince", fields: [provinceId], references: [id])
+  district     AddressBook? @relation("ApplicationDistrict", fields: [districtId], references: [id])
+  municipality AddressBook? @relation("ApplicationMunicipality", fields: [municipalityId], references: [id])
+  ward         Ward?        @relation(fields: [wardId], references: [id])
 
   @@index([userId])
   @@index([status])
+  @@index([sponsorDistributorId])
+  @@index([wardId])
   @@map("distributorapplication")
 }
 
@@ -212,10 +249,164 @@ model AddressBook {
   addressesAsDistrict      Address[]                 @relation("AddressDistrict")
   addressesAsMunicipality  Address[]                 @relation("AddressMunicipality")
   municipalityShippingRate MunicipalityShippingRate?
+  wards                    Ward[]
+
+  applicationsAsProvince     DistributorApplication[] @relation("ApplicationProvince")
+  applicationsAsDistrict     DistributorApplication[] @relation("ApplicationDistrict")
+  applicationsAsMunicipality DistributorApplication[] @relation("ApplicationMunicipality")
 
   @@index([parentId])
   @@index([level])
   @@map("addressbook")
+}
+
+/// A single ward within a municipality — the finest-grained unit dealer routing operates on.
+/// Lazily materialized per (municipality, wardNo): rows are created on demand as an admin
+/// assigns a dealer to a ward, rather than pre-seeding every possible ward number up front.
+model Ward {
+  id             Int      @id @default(autoincrement())
+  municipalityId Int
+  wardNo         Int
+  createdAt      DateTime @default(now())
+
+  municipality AddressBook @relation(fields: [municipalityId], references: [id], onDelete: Cascade)
+
+  dealerAssignments DealerWardAssignment[]
+  shippingCharges   DealerShippingCharge[]
+  applications      DistributorApplication[]
+  orders            Order[]
+  distancesFrom     WardDistance[]           @relation("WardDistanceFrom")
+  distancesTo       WardDistance[]           @relation("WardDistanceTo")
+
+  @@unique([municipalityId, wardNo])
+  @@index([municipalityId])
+  @@map("ward")
+}
+
+/// Admin-configurable ward-to-ward proximity, used to rank alternative dealers when the
+/// customer's primary dealer can't fulfill the order (see lib/dealerSelection.ts). Optional:
+/// pairs with no row fall back to a same-municipality heuristic rather than blocking checkout.
+model WardDistance {
+  id         Int @id @default(autoincrement())
+  fromWardId Int
+  toWardId   Int
+  distance   Int
+
+  fromWard Ward @relation("WardDistanceFrom", fields: [fromWardId], references: [id], onDelete: Cascade)
+  toWard   Ward @relation("WardDistanceTo", fields: [toWardId], references: [id], onDelete: Cascade)
+
+  @@unique([fromWardId, toWardId])
+  @@index([fromWardId])
+  @@index([toWardId])
+  @@map("warddistance")
+}
+
+/// A physical ward-serving fulfillment point. Always backed by an approved Distributor account
+/// (userId, unique) rather than a duplicate identity — being a Dealer is a capability granted to
+/// an existing Distributor, not a separate signup. Most Distributors are never Dealers.
+model Dealer {
+  id             Int          @id @default(autoincrement())
+  /// Optional — a Dealer may stand alone (no login/portal access) or be backed by an approved
+  /// Distributor account (grants that account dealer-portal access to view/ship their orders).
+  userId         Int?         @unique
+  name           String
+  phone          String?
+  email          String?
+  address        String?
+  shippingCharge Decimal      @default(0) @db.Decimal(10, 2)
+  status         EntityStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  user            User?                  @relation(fields: [userId], references: [id], onDelete: SetNull)
+  wardAssignments DealerWardAssignment[]
+  inventory       DealerInventory[]
+  shippingCharges DealerShippingCharge[]
+  orders          Order[]
+
+  @@index([status])
+  @@map("dealer")
+}
+
+/// Ward -> Dealer routing. `priority` 1 is the primary/deterministic dealer for a ward;
+/// `@@unique([wardId, priority])` guarantees exactly one dealer holds any given priority slot
+/// per ward (so exactly one primary), while still leaving room for a future priority 2+
+/// backup dealer without a schema redesign.
+model DealerWardAssignment {
+  id        Int      @id @default(autoincrement())
+  dealerId  Int
+  wardId    Int
+  priority  Int      @default(1)
+  createdAt DateTime @default(now())
+
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  ward   Ward   @relation(fields: [wardId], references: [id], onDelete: Cascade)
+
+  @@unique([wardId, priority])
+  @@index([dealerId])
+  @@index([wardId])
+  @@map("dealerwardassignment")
+}
+
+/// Per-dealer stock, separate from the global Product.stock/ProductVariant.stockQuantity used
+/// by the (non-dealer) storefront. Absence of a row means zero stock for that dealer/product.
+model DealerInventory {
+  id        Int      @id @default(autoincrement())
+  dealerId  Int
+  productId Int
+  variantId Int?
+  stock     Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dealer  Dealer          @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  product Product         @relation(fields: [productId], references: [id], onDelete: Cascade)
+  variant ProductVariant? @relation(fields: [variantId], references: [id], onDelete: Cascade)
+
+  @@unique([dealerId, productId, variantId])
+  @@index([dealerId])
+  @@index([productId])
+  @@map("dealerinventory")
+}
+
+/// Ward-specific shipping override for a dealer. A dealer's `Dealer.shippingCharge` is the
+/// default; a row here overrides it for one specific ward. No row = use the dealer default.
+model DealerShippingCharge {
+  id        Int      @id @default(autoincrement())
+  dealerId  Int
+  wardId    Int
+  charge    Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  dealer Dealer @relation(fields: [dealerId], references: [id], onDelete: Cascade)
+  ward   Ward   @relation(fields: [wardId], references: [id], onDelete: Cascade)
+
+  @@unique([dealerId, wardId])
+  @@index([dealerId])
+  @@index([wardId])
+  @@map("dealershippingcharge")
+}
+
+/// Generic audit trail for sensitive admin actions (distributor approve/reject, dealer/ward/
+/// shipping changes). Kept deliberately simple — a flat event log, not an event-sourced model.
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  actorId    Int
+  action     String
+  entityType String
+  entityId   String?
+  oldValue   Json?
+  newValue   Json?
+  reason     String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  actor User @relation(fields: [actorId], references: [id])
+
+  @@index([actorId])
+  @@index([entityType, entityId])
+  @@map("auditlog")
 }
 
 model Category {
@@ -344,6 +535,7 @@ model Product {
   reviews              Review[]
   distributorDiscounts ProductDistributorDiscount[]
   distributorPvRules   ProductDistributorPv[]
+  dealerInventory      DealerInventory[]
 
   @@index([categoryId])
   @@index([brandId])
@@ -467,6 +659,7 @@ model ProductVariant {
   attributeValues ProductVariantValue[]
   cartItems       CartItem[]
   wishlistItems   WishlistItem[]
+  dealerInventory DealerInventory[]
 
   @@index([productId])
   @@index([status])
@@ -616,6 +809,13 @@ model Order {
   postalCode String
   country    String
 
+  // dealer routing — resolved once at checkout and snapshotted so later dealer/ward
+  // reassignment or dealer edits never rewrite the history of an already-placed order
+  wardId      Int?
+  dealerId    Int?
+  dealerName  String?
+  dealerPhone String?
+
   subtotal    Decimal @db.Decimal(10, 2)
   discount    Decimal @default(0) @db.Decimal(10, 2)
   shippingFee Decimal @default(0) @db.Decimal(10, 2)
@@ -648,9 +848,13 @@ model Order {
   coupon  Coupon?              @relation(fields: [couponId], references: [id])
   items   OrderItem[]
   history OrderStatusHistory[]
+  ward    Ward?                @relation(fields: [wardId], references: [id])
+  dealer  Dealer?              @relation(fields: [dealerId], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([status])
+  @@index([wardId])
+  @@index([dealerId])
   @@map("order")
 }
 
@@ -834,6 +1038,8 @@ model Notification {
   id        Int      @id @default(autoincrement())
   userId    Int
   message   String
+  type      String?
+  link      String?
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 

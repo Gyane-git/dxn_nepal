@@ -5,7 +5,7 @@ import Link from "next/link";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Pagination } from "@/components/admin/Pagination";
 
-type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED";
+type ApplicationStatus = "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED";
 
 interface ApplicationRow {
   id: number;
@@ -17,7 +17,7 @@ interface ApplicationRow {
 }
 
 const PAGE_SIZE = 20;
-const TABS: ApplicationStatus[] = ["PENDING", "APPROVED", "REJECTED"];
+const TABS: ApplicationStatus[] = ["PENDING", "APPROVED", "REJECTED", "CANCELLED"];
 
 export default function AdminDistributorsPage() {
   const [status, setStatus] = useState<ApplicationStatus>("PENDING");

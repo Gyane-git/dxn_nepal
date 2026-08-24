@@ -12,7 +12,7 @@ export default async function DistributorPortalPage() {
 
   const user = await prisma.user.findUnique({
     where: { id: sessionUser.id },
-    select: { name: true, phone: true },
+    select: { name: true, phone: true, email: true },
   });
   if (!user) redirect("/login");
 
@@ -34,6 +34,7 @@ export default async function DistributorPortalPage() {
         <DistributorApplicationForm
           defaultName={user.name}
           defaultPhone={user.phone ?? ""}
+          defaultEmail={user.email}
           application={
             application
               ? { status: application.status, rejectionReason: application.rejectionReason, createdAt: application.createdAt.toISOString() }

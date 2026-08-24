@@ -14,6 +14,11 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       include: {
         user: { select: { id: true, name: true, email: true, phone: true, createdAt: true } },
         reviewedBy: { select: { id: true, name: true } },
+        sponsor: { select: { id: true, name: true, distributorId: true } },
+        province: { select: { id: true, name: true } },
+        district: { select: { id: true, name: true } },
+        municipality: { select: { id: true, name: true } },
+        ward: { select: { id: true, wardNo: true } },
       },
     });
     if (!application) return fail(404, "Application not found");

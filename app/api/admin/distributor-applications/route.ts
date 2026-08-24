@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const { page, pageSize, skip } = parsePagination(searchParams);
 
-    const where = status ? { status: status as "PENDING" | "APPROVED" | "REJECTED" } : {};
+    const where = status ? { status: status as "PENDING" | "APPROVED" | "REJECTED" | "CANCELLED" } : {};
 
     const [applications, total] = await Promise.all([
       prisma.distributorApplication.findMany({

@@ -4,6 +4,7 @@ import { ok, fail, handleApiError } from "@/lib/api";
 import { notify } from "@/lib/notify";
 import { sendMailBestEffort, distributorApplicationApprovedEmail } from "@/lib/mail";
 import { generateDistributorId } from "@/lib/distributorId";
+import { recordAudit } from "@/lib/audit";
 
 export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -37,7 +38,19 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return { distributorId: newDistributorId, user: updatedUser };
     });
 
-    await notify(user.id, `Your distributor application was approved! Your Distributor ID is ${distributorId}.`);
+    await recordAudit({
+      actorId: admin.id,
+      action: "distributor_application.approve",
+      entityType: "DistributorApplication",
+      entityId: id,
+      oldValue: { status: application.status },
+      newValue: { status: "APPROVED", distributorId },
+    });
+
+    await notify(user.id, `Your distributor application was approved! Your Distributor ID is ${distributorId}.`, {
+      type: "distributor_application",
+      link: "/distributor",
+    });
     await sendMailBestEffort({
       to: user.email,
       ...distributorApplicationApprovedEmail({ name: user.name, distributorId }),

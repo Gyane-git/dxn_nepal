@@ -8,12 +8,13 @@ import { checkEsewaStatus, resolveEsewaConfig } from "@/lib/esewa";
 import {
   applyCoupon,
   computeSubtotal,
-  computeShippingAndTax,
   createOrderFromCart,
   loadValidatedCart,
+  parseSelectedItems,
   resolveCartPricing,
   resolveShippingAddress,
 } from "@/lib/checkoutCore";
+import { computeShippingTaxAndDealer, notifyDealerOfOrder } from "@/lib/dealerCheckout";
 import { getPaymentSettings } from "@/lib/settings";
 
 /**
@@ -35,11 +36,17 @@ export async function POST(request: Request) {
     if (existing) return ok({ orderNumber: existing.orderNumber }, "Order already recorded");
 
     const shipping = await resolveShippingAddress(user, body);
-    const cart = await loadValidatedCart(user.id);
+    const cart = await loadValidatedCart(user.id, parseSelectedItems(body));
     const pricing = await resolveCartPricing(cart, user);
     const subtotal = computeSubtotal(cart, pricing);
     const { discount, couponId } = await applyCoupon(subtotal, body.couponCode);
-    const { shippingFee, tax, taxLabel, total } = await computeShippingAndTax(shipping.country, subtotal, discount, shipping.municipalityId);
+    const { shippingFee, tax, taxLabel, total, dealer } = await computeShippingTaxAndDealer(
+      shipping,
+      subtotal,
+      discount,
+      cart,
+      body.dealerId
+    );
 
     const paymentSettings = await getPaymentSettings();
     const esewaConfig = resolveEsewaConfig(paymentSettings);
@@ -73,9 +80,14 @@ export async function POST(request: Request) {
       paymentStatus: "PAID",
       paymentReference: result.ref_id,
       historyNote: `Order placed — paid via eSewa (ref: ${result.ref_id ?? "n/a"})`,
+      dealer,
     });
 
-    await notify(user.id, `Your order ${order.orderNumber} has been placed and is now Processing.`);
+    await notify(user.id, `Your order ${order.orderNumber} has been placed and is now Processing.`, {
+      type: "order",
+      link: "/account/orders",
+    });
+    if (dealer) await notifyDealerOfOrder(dealer.id, order.orderNumber);
 
     const items = cart.items.map((item) => ({
       name: item.product.name,

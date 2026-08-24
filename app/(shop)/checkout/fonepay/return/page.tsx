@@ -11,7 +11,7 @@ const DRAFT_KEY = "bikesh-checkout-draft";
 function FonepayReturnContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { clear } = useCart();
+  const { refresh } = useCart();
   const [message, setMessage] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,6 +41,8 @@ function FonepayReturnContent() {
           address: draft.address,
           saveAddress: draft.saveAddress,
           couponCode: draft.couponCode,
+          dealerId: draft.dealerId,
+          selectedItems: draft.selectedItems,
         }),
       });
       const json = await res.json();
@@ -51,7 +53,7 @@ function FonepayReturnContent() {
       }
 
       sessionStorage.removeItem(DRAFT_KEY);
-      await clear();
+      await refresh();
       router.replace(`/order/success/${json.data.orderNumber}`);
     }
 

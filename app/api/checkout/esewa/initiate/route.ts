@@ -5,11 +5,12 @@ import { buildEsewaFormFields, resolveEsewaConfig } from "@/lib/esewa";
 import {
   applyCoupon,
   computeSubtotal,
-  computeShippingAndTax,
   loadValidatedCart,
+  parseSelectedItems,
   resolveCartPricing,
   resolveShippingAddress,
 } from "@/lib/checkoutCore";
+import { computeShippingTaxAndDealer } from "@/lib/dealerCheckout";
 import { getPaymentSettings } from "@/lib/settings";
 
 /**
@@ -28,11 +29,11 @@ export async function POST(request: Request) {
     // Validate the address shape without persisting — persisting happens once at /complete.
     const shipping = await resolveShippingAddress(user, body, { persist: false });
 
-    const cart = await loadValidatedCart(user.id);
+    const cart = await loadValidatedCart(user.id, parseSelectedItems(body));
     const pricing = await resolveCartPricing(cart, user);
     const subtotal = computeSubtotal(cart, pricing);
     const { discount } = await applyCoupon(subtotal, body.couponCode);
-    const { shippingFee, tax, total } = await computeShippingAndTax(shipping.country, subtotal, discount, shipping.municipalityId);
+    const { shippingFee, tax, total } = await computeShippingTaxAndDealer(shipping, subtotal, discount, cart, body.dealerId);
 
     if (total <= 0) return fail(400, "Order total must be greater than zero to pay online");
 

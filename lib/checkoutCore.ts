@@ -23,8 +23,11 @@ export interface ShippingSnapshot {
   state: string;
   postalCode: string;
   country: string;
-  /** Not persisted onto Order — carried alongside the snapshot only so checkout can look up a municipality-specific shipping rate. */
+  /** Not persisted onto Order directly — carried alongside the snapshot so checkout can look up
+   * a municipality-specific shipping rate and resolve dealer options (dealer matching is
+   * city-level, see lib/dealerSelection.ts — wardNo below is not used for that). */
   municipalityId: number;
+  wardNo: number;
 }
 
 /** Formats an Address's province/municipality/ward into the flat display strings Order stores. */
@@ -51,6 +54,7 @@ function toShippingSnapshot(
     postalCode: "",
     country: "Nepal",
     municipalityId: address.municipality.id,
+    wardNo: address.wardNo,
   };
 }
 
@@ -161,13 +165,49 @@ export function variantLabel(variant: VariantWithAttributeValues | null | undefi
   return label || null;
 }
 
-/** Loads the user's cart and throws if it's empty or any line exceeds available stock. */
-export async function loadValidatedCart(userId: number): Promise<ValidatedCart> {
+export interface SelectedCartItem {
+  productId: number;
+  variantId: number | null;
+}
+
+/**
+ * Parses the Cart page's `selectedItems` from a request body (an array of `{productId, variantId}`).
+ * Returns undefined when absent, so every checkout route can pass this straight into
+ * `loadValidatedCart` without special-casing "no selection was sent" — that path checks out the
+ * whole cart, matching behavior from before per-item selection existed.
+ */
+export function parseSelectedItems(body: { selectedItems?: unknown }): SelectedCartItem[] | undefined {
+  if (!Array.isArray(body.selectedItems)) return undefined;
+  return body.selectedItems
+    .map((item) => ({
+      productId: Number((item as { productId?: unknown })?.productId),
+      variantId:
+        (item as { variantId?: unknown })?.variantId != null
+          ? Number((item as { variantId?: unknown }).variantId)
+          : null,
+    }))
+    .filter((item): item is SelectedCartItem => Number.isFinite(item.productId));
+}
+
+/**
+ * Loads the user's cart and throws if it's empty or any line exceeds available stock. Pass
+ * `selectedItems` (from the Cart page's checkboxes) to check out only that subset — the rest of
+ * the cart is left untouched, both here and by `createOrderFromCart`'s cart cleanup below.
+ * Omitting it checks out the whole cart, preserving the pre-selection behavior.
+ */
+export async function loadValidatedCart(userId: number, selectedItems?: SelectedCartItem[]): Promise<ValidatedCart> {
   const cart = await prisma.cart.findUnique({ where: { userId }, include: cartInclude });
 
   if (!cart || cart.items.length === 0) throw new ApiError(400, "Your cart is empty");
 
-  for (const item of cart.items) {
+  let items = cart.items;
+  if (selectedItems) {
+    const keys = new Set(selectedItems.map((s) => `${s.productId}:${s.variantId ?? "base"}`));
+    items = items.filter((item) => keys.has(`${item.productId}:${item.variantId ?? "base"}`));
+    if (items.length === 0) throw new ApiError(400, "No items were selected to check out");
+  }
+
+  for (const item of items) {
     if (item.product.status !== "PUBLISHED" || item.product.deletedAt) {
       throw new ApiError(400, `${item.product.name} is no longer available. Please remove it from your cart.`);
     }
@@ -181,7 +221,7 @@ export async function loadValidatedCart(userId: number): Promise<ValidatedCart> 
     }
   }
 
-  return cart;
+  return { ...cart, items };
 }
 
 export interface CartItemPricing {
@@ -407,6 +447,8 @@ export async function createOrderFromCart(params: {
   paymentStatus: PaymentStatus;
   paymentReference?: string | null;
   historyNote: string;
+  /** Set when the city has an active dealer network and the customer picked one — see lib/dealerSelection.ts. Omitted entirely outside dealer-served cities, preserving the pre-dealer checkout flow. */
+  dealer?: { id: number; name: string; phone: string | null } | null;
 }) {
   const total = Math.max(0, params.subtotal - params.discount) + params.shippingFee + params.tax;
   const orderNumber = params.orderNumber ?? generateOrderNumber();
@@ -429,6 +471,9 @@ export async function createOrderFromCart(params: {
         state: params.shipping.state,
         postalCode: params.shipping.postalCode,
         country: params.shipping.country,
+        dealerId: params.dealer?.id ?? null,
+        dealerName: params.dealer?.name ?? null,
+        dealerPhone: params.dealer?.phone ?? null,
         subtotal: params.subtotal,
         discount: params.discount,
         shippingFee: params.shippingFee,
@@ -476,9 +521,30 @@ export async function createOrderFromCart(params: {
           data: { stock: { decrement: item.quantity } },
         });
       }
+
+      // Dealer stock is a separate, per-location allocation tracked alongside the master count
+      // above — decremented here with an explicit concurrency guard (unlike the master count,
+      // which relies on MySQL's row lock) so two simultaneous orders can never both succeed
+      // against the last unit of a dealer's stock.
+      if (params.dealer) {
+        const decremented = await tx.dealerInventory.updateMany({
+          where: {
+            dealerId: params.dealer.id,
+            productId: item.productId,
+            variantId: item.variantId,
+            stock: { gte: item.quantity },
+          },
+          data: { stock: { decrement: item.quantity } },
+        });
+        if (decremented.count === 0) {
+          throw new ApiError(409, `${item.product.name} is no longer available from the selected dealer`);
+        }
+      }
     }
 
-    await tx.cartItem.deleteMany({ where: { cartId: params.cart.id } });
+    // Only removes the items actually purchased — if the customer checked out a subset of their
+    // cart, whatever wasn't selected stays behind (see loadValidatedCart's `selectedItems`).
+    await tx.cartItem.deleteMany({ where: { id: { in: params.cart.items.map((item) => item.id) } } });
 
     return created;
   });

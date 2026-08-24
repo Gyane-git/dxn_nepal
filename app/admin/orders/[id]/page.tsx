@@ -38,6 +38,9 @@ interface AdminOrderDetail {
   returnRequested: boolean;
   returnReason: string | null;
   refunded: boolean;
+  dealerId: number | null;
+  dealerName: string | null;
+  dealerPhone: string | null;
   user: { name: string; email: string; phone: string | null };
   items: { id: string; name: string; price: number; quantity: number; discountPercent: number | null; pvEarned: number }[];
   history: { id: string; status: string; note: string | null; createdAt: string }[];
@@ -209,6 +212,20 @@ export default function AdminOrderDetailPage() {
               {order.phone} · {order.email}
             </p>
           </section>
+
+          {order.dealerName && (
+            <section className="rounded-xl border border-gray-200 bg-white p-5 text-sm shadow-soft">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Fulfilling Dealer</h2>
+              {order.dealerId ? (
+                <Link href={`/admin/dealers/${order.dealerId}`} className="mt-2 block font-medium text-slate-700 hover:underline">
+                  {order.dealerName}
+                </Link>
+              ) : (
+                <p className="mt-2 text-gray-800">{order.dealerName} <span className="text-xs text-gray-400">(dealer since removed)</span></p>
+              )}
+              {order.dealerPhone && <p className="text-gray-500">{order.dealerPhone}</p>}
+            </section>
+          )}
 
           <section className="rounded-xl border border-gray-200 bg-white p-5 text-sm shadow-soft">
             <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment</h2>

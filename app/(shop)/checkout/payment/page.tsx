@@ -17,6 +17,8 @@ interface CheckoutDraft {
   shippingLabel?: string | null;
   tax?: number;
   taxLabel?: string | null;
+  dealerId?: number | null;
+  selectedItems?: { productId: number; variantId: number | null }[];
 }
 
 const DRAFT_KEY = "bikesh-checkout-draft";
@@ -96,7 +98,7 @@ const METHOD_LABELS: Record<
 
 export default function PaymentPage() {
   const router = useRouter();
-  const { clear } = useCart();
+  const { refresh } = useCart();
   const [draft, setDraft] = useState<CheckoutDraft | null>(null);
   const [method, setMethod] = useState<PaymentMethodKey>("COD");
   const [isPaying, setIsPaying] = useState(false);
@@ -139,6 +141,8 @@ export default function PaymentPage() {
       address: draft.address,
       saveAddress: draft.saveAddress,
       couponCode: draft.couponCode,
+      dealerId: draft.dealerId,
+      selectedItems: draft.selectedItems,
     };
 
     if (method === "COD") {
@@ -156,7 +160,9 @@ export default function PaymentPage() {
       }
 
       sessionStorage.removeItem(DRAFT_KEY);
-      await clear();
+      // Only the purchased items were removed server-side (see selectedItems above) — refresh
+      // rather than clear, so anything left unchecked on the Cart page stays in the cart.
+      await refresh();
       router.push(`/order/success/${json.data.orderNumber}`);
       return;
     }
@@ -202,9 +208,7 @@ export default function PaymentPage() {
   const tax = draft.tax ?? 0;
   const total = Math.max(0, subtotal - discount) + shippingFee + tax;
 
-  const onlineMethods = (
-    ["ESEWA", "KHALTI", "FONEPAY", "CONNECTIPS", "VISA"] as const
-  ).filter((key) => {
+  const onlineMethods = (["ESEWA", "KHALTI", "FONEPAY", "CONNECTIPS", "VISA"] as const).filter((key) => {
     if (key === "ESEWA") return methods?.esewaEnabled ?? true;
     if (key === "KHALTI") return methods?.khaltiEnabled ?? false;
     if (key === "FONEPAY") return methods?.fonepayEnabled ?? false;

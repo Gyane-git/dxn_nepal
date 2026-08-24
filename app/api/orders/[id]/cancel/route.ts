@@ -44,6 +44,13 @@ export async function POST(
             data: { stock: { increment: item.quantity } },
           });
         }
+
+        if (order.dealerId) {
+          await tx.dealerInventory.updateMany({
+            where: { dealerId: order.dealerId, productId: item.productId, variantId: item.variantId },
+            data: { stock: { increment: item.quantity } },
+          });
+        }
       }
 
       await tx.orderStatusHistory.create({

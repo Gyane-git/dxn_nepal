@@ -24,18 +24,40 @@ interface ShippingEstimate {
   total: number;
 }
 
+interface DealerOption {
+  dealerId: number;
+  dealerName: string;
+  isPrimary: boolean;
+  canFulfillOrder: boolean;
+  stockStatus: "Available" | "Partial" | "Unavailable";
+  shippingCharge: number;
+}
+
+interface DealerOptionsResponse {
+  dealerSystemActive: boolean;
+  primary: DealerOption | null;
+  alternatives: DealerOption[];
+  noneAvailable: boolean;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
-  const { lines, subtotal, isLoading } = useCart();
+  const { lines, selectedLines, selectedSubtotal, isLoading } = useCart();
+  const subtotal = selectedSubtotal;
+  const selectedItemsPayload = selectedLines.map((l) => ({ productId: Number(l.productId), variantId: l.variantId }));
   const [addresses, setAddresses] = useState<SavedAddress[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [showNewForm, setShowNewForm] = useState(false);
   const [saveAddress, setSaveAddress] = useState(true);
-  const [newAddressMunicipalityId, setNewAddressMunicipalityId] = useState<number | null>(null);
+  const [newAddressLocation, setNewAddressLocation] = useState<{ municipalityId?: number; wardNo?: number }>({});
 
-  const municipalityId = showNewForm
-    ? newAddressMunicipalityId
-    : addresses.find((a) => a.id === selectedId)?.municipalityId ?? null;
+  const selectedSavedAddress = addresses.find((a) => a.id === selectedId);
+  const municipalityId = showNewForm ? newAddressLocation.municipalityId ?? null : selectedSavedAddress?.municipalityId ?? null;
+  const wardNo = showNewForm ? newAddressLocation.wardNo ?? null : selectedSavedAddress?.wardNo ?? null;
+
+  const [dealerOptions, setDealerOptions] = useState<DealerOptionsResponse | null>(null);
+  const [selectedDealerId, setSelectedDealerId] = useState<number | null>(null);
+  const [isLoadingDealers, setIsLoadingDealers] = useState(false);
 
   const [couponCode, setCouponCode] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
@@ -81,6 +103,49 @@ export default function CheckoutPage() {
     };
   }, [subtotal, discount, municipalityId]);
 
+  useEffect(() => {
+    if (!municipalityId) {
+      setDealerOptions(null);
+      setSelectedDealerId(null);
+      return;
+    }
+    let cancelled = false;
+    setIsLoadingDealers(true);
+    const cityPayload = showNewForm
+      ? { municipalityId, wardNo: wardNo ?? undefined, selectedItems: selectedItemsPayload }
+      : selectedId
+        ? { addressId: selectedId, selectedItems: selectedItemsPayload }
+        : null;
+    if (!cityPayload) {
+      setIsLoadingDealers(false);
+      return;
+    }
+    fetch("/api/checkout/dealer-options", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(cityPayload),
+    })
+      .then((res) => res.json())
+      .then((json) => {
+        if (cancelled) return;
+        const data: DealerOptionsResponse | null = json.data ?? null;
+        setDealerOptions(data);
+        if (data?.dealerSystemActive) {
+          const preferred = data.primary?.canFulfillOrder
+            ? data.primary
+            : [data.primary, ...data.alternatives].find((o) => o?.canFulfillOrder);
+          setSelectedDealerId(preferred?.dealerId ?? null);
+        } else {
+          setSelectedDealerId(null);
+        }
+      })
+      .finally(() => !cancelled && setIsLoadingDealers(false));
+
+    return () => {
+      cancelled = true;
+    };
+  }, [municipalityId, wardNo, selectedId, showNewForm]);
+
   async function applyCoupon() {
     if (!couponCode.trim()) return;
     setIsApplyingCoupon(true);
@@ -102,7 +167,20 @@ export default function CheckoutPage() {
     setAppliedCode(json.data.code);
   }
 
+  // A selected dealer's own delivery charge always overrides the flat municipality/zone estimate —
+  // both in what's displayed here and in what's carried forward to payment, so the two never disagree.
+  const chosenDealer = dealerOptions
+    ? [dealerOptions.primary, ...dealerOptions.alternatives].find((o) => o?.dealerId === selectedDealerId)
+    : null;
+  const effectiveShippingFee = chosenDealer ? chosenDealer.shippingCharge : shippingEstimate?.shippingFee ?? 0;
+  const effectiveShippingLabel = chosenDealer ? `${chosenDealer.dealerName} delivery` : shippingEstimate?.shippingLabel ?? null;
+  const effectiveTax = shippingEstimate?.tax ?? 0;
+  const effectiveTotal = Math.max(0, subtotal - discount) + effectiveShippingFee + effectiveTax;
+
   function proceedWithAddress(payload: { addressId?: number; address?: AddressInput; saveAddress?: boolean }) {
+    if (dealerOptions?.dealerSystemActive && !selectedDealerId) {
+      return;
+    }
     sessionStorage.setItem(
       "bikesh-checkout-draft",
       JSON.stringify({
@@ -110,10 +188,12 @@ export default function CheckoutPage() {
         couponCode: appliedCode,
         discount,
         subtotal,
-        shippingFee: shippingEstimate?.shippingFee ?? 0,
-        shippingLabel: shippingEstimate?.shippingLabel ?? null,
-        tax: shippingEstimate?.tax ?? 0,
+        shippingFee: effectiveShippingFee,
+        shippingLabel: effectiveShippingLabel,
+        tax: effectiveTax,
         taxLabel: shippingEstimate?.taxLabel ?? null,
+        dealerId: selectedDealerId,
+        selectedItems: selectedItemsPayload,
       })
     );
     router.push("/checkout/payment");
@@ -136,6 +216,14 @@ export default function CheckoutPage() {
     return (
       <div className="mx-auto max-w-7xl px-4 py-16 text-center text-gray-500">
         Your cart is empty. <a href="/shop" className="text-primary-600 underline">Go shopping</a>.
+      </div>
+    );
+  }
+
+  if (selectedLines.length === 0) {
+    return (
+      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-gray-500">
+        No items are selected for checkout. <a href="/cart" className="text-primary-600 underline">Go back to your cart</a> and select what you&apos;d like to buy.
       </div>
     );
   }
@@ -197,7 +285,7 @@ export default function CheckoutPage() {
                   onSubmit={onSubmitNewAddress}
                   onCancel={addresses.length > 0 ? () => setShowNewForm(false) : undefined}
                   submitLabel="Continue to Payment"
-                  onLocationChange={(loc) => setNewAddressMunicipalityId(loc.municipalityId ?? null)}
+                  onLocationChange={(loc) => setNewAddressLocation({ municipalityId: loc.municipalityId, wardNo: loc.wardNo })}
                   extraFooter={
                     <label className="flex items-center gap-2 text-sm text-gray-600 sm:col-span-2">
                       <input type="checkbox" checked={saveAddress} onChange={(e) => setSaveAddress(e.target.checked)} />
@@ -209,7 +297,12 @@ export default function CheckoutPage() {
             )}
 
             {addresses.length > 0 && !showNewForm && (
-              <Button className="mt-5 w-full" size="lg" onClick={continueWithSavedAddress} disabled={!selectedId}>
+              <Button
+                className="mt-5 w-full"
+                size="lg"
+                onClick={continueWithSavedAddress}
+                disabled={!selectedId || (dealerOptions?.dealerSystemActive && !selectedDealerId)}
+              >
                 Continue to Payment
               </Button>
             )}
@@ -219,7 +312,7 @@ export default function CheckoutPage() {
         <div className="w-full shrink-0 self-start rounded-2xl border border-gray-200 bg-white p-6 shadow-soft lg:w-[30rem]">
           <h2 className="text-sm font-semibold text-gray-900">Order Summary</h2>
           <ul className="mt-4 space-y-2.5 text-sm text-gray-600">
-            {lines.map((line) => (
+            {selectedLines.map((line) => (
               <li key={line.productId} className="flex items-start justify-between gap-3">
                 <span className="min-w-0 flex-1 truncate">{line.name} × {line.quantity}</span>
                 <span className="shrink-0 whitespace-nowrap">{formatPrice(line.price * line.quantity)}</span>
@@ -256,33 +349,86 @@ export default function CheckoutPage() {
             <div className="flex items-start justify-between gap-3 text-gray-600">
               <span className="min-w-0">
                 Shipping
-                {shippingEstimate?.shippingLabel && (
-                  <span className="block truncate text-xs text-gray-400">{shippingEstimate.shippingLabel}</span>
+                {effectiveShippingLabel && (
+                  <span className="block truncate text-xs text-gray-400">{effectiveShippingLabel}</span>
                 )}
               </span>
               <span className="shrink-0 whitespace-nowrap">
-                {isEstimating
+                {isEstimating || isLoadingDealers
                   ? "…"
-                  : shippingEstimate
-                    ? shippingEstimate.shippingFee > 0
-                      ? formatPrice(shippingEstimate.shippingFee)
+                  : shippingEstimate || chosenDealer
+                    ? effectiveShippingFee > 0
+                      ? formatPrice(effectiveShippingFee)
                       : "Free"
                     : "—"}
               </span>
             </div>
-            {shippingEstimate && shippingEstimate.tax > 0 && (
+            {effectiveTax > 0 && (
               <div className="flex items-start justify-between gap-3 text-gray-600">
-                <span className="min-w-0 truncate">{shippingEstimate.taxLabel ?? "Tax"}</span>
-                <span className="shrink-0 whitespace-nowrap">{formatPrice(shippingEstimate.tax)}</span>
+                <span className="min-w-0 truncate">{shippingEstimate?.taxLabel ?? "Tax"}</span>
+                <span className="shrink-0 whitespace-nowrap">{formatPrice(effectiveTax)}</span>
               </div>
             )}
             <div className="flex items-start justify-between gap-3 pt-1 text-base font-bold text-gray-900">
               <span>Total</span>
-              <span className="shrink-0 whitespace-nowrap">
-                {formatPrice(shippingEstimate ? shippingEstimate.total : Math.max(0, subtotal - discount))}
-              </span>
+              <span className="shrink-0 whitespace-nowrap">{formatPrice(effectiveTotal)}</span>
             </div>
           </div>
+
+          {municipalityId && (
+            <div className="mt-6 border-t border-gray-100 pt-5">
+              <h2 className="text-sm font-semibold text-gray-900">Buy Product From</h2>
+
+              {isLoadingDealers ? (
+                <p className="mt-3 text-sm text-gray-500">Checking dealer availability…</p>
+              ) : !dealerOptions?.dealerSystemActive ? null : dealerOptions.noneAvailable ? (
+                <p className="mt-3 rounded-lg bg-red-50 p-3 text-sm text-red-700">
+                  Sorry, this order cannot currently be fulfilled from the available dealers in your city. Try
+                  reducing quantities, removing an unavailable product, or choosing a different address.
+                </p>
+              ) : (
+                <div className="mt-3 max-h-72 space-y-2.5 overflow-y-auto pr-1">
+                  {[dealerOptions.primary, ...dealerOptions.alternatives]
+                    .filter((o): o is DealerOption => o !== null)
+                    .map((option) => (
+                      <label
+                        key={option.dealerId}
+                        className={`flex cursor-pointer items-start gap-3 rounded-xl border p-3 text-sm transition-colors ${
+                          option.canFulfillOrder ? "" : "cursor-not-allowed opacity-60"
+                        } ${
+                          selectedDealerId === option.dealerId
+                            ? "border-primary-400 bg-primary-50 ring-1 ring-primary-200"
+                            : "border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="dealer"
+                          disabled={!option.canFulfillOrder}
+                          checked={selectedDealerId === option.dealerId}
+                          onChange={() => setSelectedDealerId(option.dealerId)}
+                          className="mt-1 accent-primary-600"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-gray-900">
+                            {option.dealerName}
+                            {option.isPrimary && <span className="ml-2 text-xs font-normal text-gray-400">Your area dealer</span>}
+                          </p>
+                          <p className="text-gray-500">
+                            {option.stockStatus === "Available"
+                              ? "Stock available"
+                              : option.stockStatus === "Partial"
+                                ? "Partial stock — cannot fulfill full order"
+                                : "Unavailable"}
+                            {" · "}Delivery: {formatPrice(option.shippingCharge)}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

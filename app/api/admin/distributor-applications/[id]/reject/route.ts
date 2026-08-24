@@ -4,6 +4,7 @@ import { ok, fail, handleApiError } from "@/lib/api";
 import { notify } from "@/lib/notify";
 import { sendMailBestEffort, distributorApplicationRejectedEmail } from "@/lib/mail";
 import { reviewApplicationSchema } from "@/schemas/distributor";
+import { recordAudit } from "@/lib/audit";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -20,7 +21,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     if (!application) return fail(404, "Application not found");
     if (application.status !== "PENDING") return fail(400, `Application is already ${application.status.toLowerCase()}`);
 
-    const rejectionReason = parsed.data.rejectionReason || null;
+    const rejectionReason = parsed.data.rejectionReason;
 
     await prisma.distributorApplication.update({
       where: { id },
@@ -32,7 +33,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       },
     });
 
-    await notify(application.userId, "Your distributor application was not approved. You remain a valued customer.");
+    await recordAudit({
+      actorId: admin.id,
+      action: "distributor_application.reject",
+      entityType: "DistributorApplication",
+      entityId: id,
+      oldValue: { status: application.status },
+      newValue: { status: "REJECTED" },
+      reason: rejectionReason,
+    });
+
+    await notify(application.userId, "Your distributor application was not approved. You remain a valued customer.", {
+      type: "distributor_application",
+      link: "/distributor",
+    });
     await sendMailBestEffort({
       to: application.user.email,
       ...distributorApplicationRejectedEmail({ name: application.user.name }, rejectionReason),

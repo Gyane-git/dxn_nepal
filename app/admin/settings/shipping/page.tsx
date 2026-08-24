@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { Pencil, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
-import { useAddressBookTree } from "@/hooks/useAddressBookTree";
+import { useAddressBookTree, type AddressBookTree } from "@/hooks/useAddressBookTree";
 
 interface ShippingZoneRow {
   id: number;
@@ -36,6 +37,14 @@ interface MunicipalityRateRow {
   label: string | null;
   rate: number;
   freeShippingMinOrder: number | null;
+}
+
+interface DealerShippingChargeRow {
+  id: number;
+  charge: string;
+  isActive: boolean;
+  dealer: { id: number; name: string; status: "ACTIVE" | "INACTIVE" };
+  ward: { id: number; wardNo: number; municipality: { id: number; name: string } };
 }
 
 type ZoneFormValues = Omit<ShippingZoneRow, "id">;
@@ -712,6 +721,8 @@ export default function ShippingTaxSettingsPage() {
         </div>
       </section>
 
+      <DealerShippingChargesSection />
+
       {zoneModal && (
         <ModalShell title={zoneModal.id === null ? "Add Shipping Zone" : "Edit Shipping Zone"} onClose={() => setZoneModal(null)}>
           <form
@@ -1007,5 +1018,143 @@ export default function ShippingTaxSettingsPage() {
         onCancel={() => setDeleteMunicipalityRateTarget(null)}
       />
     </div>
+  );
+}
+
+/** Cross-dealer view of every ward-specific shipping override — see AGENTS brief section 30. Creating a new override still happens from the dealer's own page (its ward picker is scoped to that dealer's context); this section is for the at-a-glance overview plus edit/enable/disable/delete. */
+function DealerShippingChargesSection() {
+  const [rows, setRows] = useState<DealerShippingChargeRow[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [drafts, setDrafts] = useState<Record<number, string>>({});
+  const [deleteTarget, setDeleteTarget] = useState<DealerShippingChargeRow | null>(null);
+  const [isBusy, setIsBusy] = useState(false);
+
+  const load = useCallback(() => {
+    setIsLoading(true);
+    fetch("/api/admin/dealer-shipping-charges")
+      .then((res) => res.json())
+      .then((json) => setRows(json.data ?? []))
+      .finally(() => setIsLoading(false));
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function saveCharge(row: DealerShippingChargeRow) {
+    const value = Number(drafts[row.id] ?? row.charge);
+    if (Number.isNaN(value) || value < 0) return;
+    await fetch(`/api/admin/dealer-shipping-charges/${row.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ charge: value }),
+    });
+    load();
+  }
+
+  async function toggleActive(row: DealerShippingChargeRow) {
+    setRows((prev) => prev.map((r) => (r.id === row.id ? { ...r, isActive: !r.isActive } : r)));
+    await fetch(`/api/admin/dealer-shipping-charges/${row.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ isActive: !row.isActive }),
+    });
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setIsBusy(true);
+    await fetch(`/api/admin/dealer-shipping-charges/${deleteTarget.id}`, { method: "DELETE" });
+    setIsBusy(false);
+    setDeleteTarget(null);
+    load();
+  }
+
+  return (
+    <section className="mt-6 rounded-xl border border-gray-200 bg-white p-5 shadow-soft">
+      <div>
+        <h2 className="text-sm font-semibold text-gray-900">Dealer Shipping Charges</h2>
+        <p className="mt-0.5 text-xs text-gray-500">
+          Ward-specific overrides across every dealer. Add a new override from a dealer&apos;s own page (Shipping tab).
+        </p>
+      </div>
+
+      <div className="mt-4">
+        {isLoading ? (
+          <p className="py-6 text-center text-sm text-gray-500">Loading...</p>
+        ) : rows.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-500">No dealer shipping overrides configured yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-sm">
+              <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-3">Dealer</th>
+                  <th className="px-4 py-3">City</th>
+                  <th className="px-4 py-3 text-right">Charge</th>
+                  <th className="px-4 py-3 text-center">Active</th>
+                  <th className="px-4 py-3"></th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {rows.map((row) => (
+                  <tr key={row.id} className={row.isActive ? "" : "opacity-50"}>
+                    <td className="px-4 py-3.5">
+                      <Link href={`/admin/dealers/${row.dealer.id}`} className="font-medium text-gray-900 hover:text-slate-600">
+                        {row.dealer.name}
+                      </Link>
+                      {row.dealer.status === "INACTIVE" && <span className="ml-2 text-xs text-red-500">Inactive dealer</span>}
+                    </td>
+                    <td className="px-4 py-3.5 text-gray-600">
+                      {row.ward.wardNo === 0 ? row.ward.municipality.name : `${row.ward.municipality.name} (Ward ${row.ward.wardNo})`}
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <input
+                        type="number"
+                        min={0}
+                        value={drafts[row.id] ?? row.charge}
+                        onChange={(e) => setDrafts((prev) => ({ ...prev, [row.id]: e.target.value }))}
+                        onBlur={() => saveCharge(row)}
+                        className="w-24 rounded-lg border border-gray-200 px-2 py-1 text-right text-sm outline-none focus:border-slate-400"
+                      />
+                    </td>
+                    <td className="px-4 py-3.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={row.isActive}
+                        onChange={() => toggleActive(row)}
+                        className="h-4 w-4 rounded border-gray-300 text-slate-700 focus:ring-slate-400"
+                      />
+                    </td>
+                    <td className="px-4 py-3.5 text-right">
+                      <button
+                        type="button"
+                        title="Delete"
+                        aria-label="Delete"
+                        onClick={() => setDeleteTarget(row)}
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={deleteTarget !== null}
+        title="Delete this shipping override?"
+        description={`This removes the override for ${deleteTarget?.dealer.name ?? ""} on Ward ${deleteTarget?.ward.wardNo ?? ""}. The dealer's default shipping charge applies afterward.`}
+        confirmLabel="Delete"
+        danger
+        isBusy={isBusy}
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleteTarget(null)}
+      />
+    </section>
   );
 }

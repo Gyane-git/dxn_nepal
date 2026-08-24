@@ -67,6 +67,12 @@ export async function PATCH(
               data: { stock: { increment: item.quantity } },
             });
           }
+          if (order.dealerId) {
+            await tx.dealerInventory.updateMany({
+              where: { dealerId: order.dealerId, productId: item.productId, variantId: item.variantId },
+              data: { stock: { increment: item.quantity } },
+            });
+          }
         }
         message = `Your order ${order.orderNumber} has been cancelled.`;
       }
