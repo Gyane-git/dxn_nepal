@@ -29,6 +29,7 @@ export const authOptions: NextAuthOptions = {
         if (!isValid) return null;
 
         if (!user.emailVerified) throw new Error("EMAIL_NOT_VERIFIED");
+        if (user.status === "DISABLED") throw new Error("ACCOUNT_DISABLED");
 
         return {
           id: user.id,

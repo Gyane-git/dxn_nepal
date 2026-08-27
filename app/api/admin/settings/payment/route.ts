@@ -1,4 +1,4 @@
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { getPaymentSettings, updatePaymentSettings } from "@/lib/settings";
 import { paymentSettingsSchema } from "@/schemas/admin-settings";
@@ -25,7 +25,7 @@ function serialize(settings: Awaited<ReturnType<typeof getPaymentSettings>>) {
 
 export async function GET() {
   try {
-    await requireAdmin();
+    await requirePermission("settings.view");
     const settings = await getPaymentSettings();
     return ok(serialize(settings));
   } catch (error) {
@@ -35,7 +35,7 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("settings.manage");
     const body = await request.json();
     const parsed = paymentSettingsSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { recordAudit } from "@/lib/audit";
 import { z } from "zod";
@@ -15,10 +15,15 @@ const updateDealerSchema = z.object({
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("dealers.view");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid dealer id");
+
+    // A dealer-linked login may only ever view its own dealer profile — never another dealer's.
+    if (!admin.isSuperAdmin && admin.dealerId != null && admin.dealerId !== id) {
+      return fail(403, "You can only view your own dealer profile");
+    }
 
     const dealer = await prisma.dealer.findUnique({
       where: { id },
@@ -44,10 +49,16 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("dealers.edit");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid dealer id");
+
+    // Dealer profile (name/shipping/status) stays Super-Admin/staff-managed — a dealer persona
+    // may update its own inventory quantities (see the inventory route), never its own profile.
+    if (!admin.isSuperAdmin && admin.dealerId != null) {
+      return fail(403, "Only an administrator can edit dealer profile details");
+    }
 
     const existing = await prisma.dealer.findUnique({ where: { id } });
     if (!existing) return fail(404, "Dealer not found");

@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
 import { ensureUniqueSlug } from "@/lib/slug";
@@ -8,7 +8,7 @@ import { categorySchema } from "@/schemas/admin-category";
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("categories.view");
     const { searchParams } = new URL(request.url);
 
     const search = searchParams.get("search")?.trim();
@@ -61,7 +61,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("categories.create");
     const body = await request.json();
     const parsed = categorySchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

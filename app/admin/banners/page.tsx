@@ -23,6 +23,7 @@ import { GripVertical, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { BannerFormModal, EMPTY_BANNER, type BannerFormValues } from "@/components/admin/banners/BannerFormModal";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface Banner {
   id: number;
@@ -57,6 +58,7 @@ function SortableRow({
   onEdit: (banner: Banner) => void;
   onDelete: (id: number) => void;
 }) {
+  const { can } = usePermissions();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: banner.id });
 
   return (
@@ -65,15 +67,17 @@ function SortableRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={`flex items-center gap-3 border-b border-gray-100 bg-white px-3 py-2.5 ${isDragging ? "opacity-50" : ""}`}
     >
-      <button
-        type="button"
-        {...attributes}
-        {...listeners}
-        className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center text-gray-300 hover:text-gray-500 active:cursor-grabbing"
-        aria-label="Drag to reorder"
-      >
-        <GripVertical className="h-4 w-4" />
-      </button>
+      {can("banners.edit") && (
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          className="flex h-6 w-6 shrink-0 cursor-grab items-center justify-center text-gray-300 hover:text-gray-500 active:cursor-grabbing"
+          aria-label="Drag to reorder"
+        >
+          <GripVertical className="h-4 w-4" />
+        </button>
+      )}
 
       <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-gray-50">
         <Image src={banner.image} alt="" fill sizes="80px" className="object-cover" />
@@ -92,29 +96,34 @@ function SortableRow({
         {banner.active ? "Active" : "Inactive"}
       </span>
 
-      <button
-        type="button"
-        onClick={() => onEdit(banner)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-slate-700"
-        aria-label="Edit"
-        title="Edit"
-      >
-        <Pencil className="h-4 w-4" />
-      </button>
-      <button
-        type="button"
-        onClick={() => onDelete(banner.id)}
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
-        aria-label="Delete"
-        title="Delete"
-      >
-        <Trash2 className="h-4 w-4" />
-      </button>
+      {can("banners.edit") && (
+        <button
+          type="button"
+          onClick={() => onEdit(banner)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-gray-100 hover:text-slate-700"
+          aria-label="Edit"
+          title="Edit"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
+      )}
+      {can("banners.delete") && (
+        <button
+          type="button"
+          onClick={() => onDelete(banner.id)}
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-gray-400 transition-colors hover:bg-red-50 hover:text-red-600"
+          aria-label="Delete"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      )}
     </div>
   );
 }
 
 export default function BannersPage() {
+  const { can } = usePermissions();
   const [banners, setBanners] = useState<Banner[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isBusy, setIsBusy] = useState(false);
@@ -195,9 +204,11 @@ export default function BannersPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Home Banners</h1>
           <p className="mt-1 text-sm text-gray-500">Manage the hero carousel slides shown on the storefront homepage.</p>
         </div>
-        <Button variant="admin" size="sm" onClick={() => setModal({ mode: "create" })}>
-          New Banner
-        </Button>
+        {can("banners.create") && (
+          <Button variant="admin" size="sm" onClick={() => setModal({ mode: "create" })}>
+            New Banner
+          </Button>
+        )}
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft">

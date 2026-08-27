@@ -1,10 +1,10 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, handleApiError } from "@/lib/api";
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("distributors.view");
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim();
 

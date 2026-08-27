@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { resolveOrCreateWard } from "@/lib/ward";
 import { recordAudit } from "@/lib/audit";
@@ -20,7 +20,7 @@ const assignSchema = z.object({
  */
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("dealers.edit");
     const body = await request.json();
     const parsed = assignSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

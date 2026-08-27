@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { resolveOrCreateWard } from "@/lib/ward";
 import { recordAudit } from "@/lib/audit";
@@ -8,7 +8,7 @@ import { z } from "zod";
 /** Without `dealerId`, lists every dealer's ward overrides — the admin's cross-dealer shipping view. */
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("dealers.view");
     const { searchParams } = new URL(request.url);
     const dealerIdParam = searchParams.get("dealerId");
     const dealerId = dealerIdParam ? Number(dealerIdParam) : null;
@@ -40,7 +40,7 @@ const createChargeSchema = z.object({
 /** Creates or overwrites the city-specific shipping override for a dealer — one active rule per (dealer, city). */
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("dealers.edit");
     const body = await request.json();
     const parsed = createChargeSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

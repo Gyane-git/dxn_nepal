@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/Input";
 import { Select } from "@/components/ui/Select";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
 import { useAddressBookTree, type AddressBookTree } from "@/hooks/useAddressBookTree";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface ShippingZoneRow {
   id: number;
@@ -84,6 +85,7 @@ function ModalShell({ title, onClose, children }: { title: string; onClose: () =
 }
 
 export default function ShippingTaxSettingsPage() {
+  const { can } = usePermissions();
   const [zones, setZones] = useState<ShippingZoneRow[]>([]);
   const [rates, setRates] = useState<TaxRateRow[]>([]);
   const [municipalityRates, setMunicipalityRates] = useState<MunicipalityRateRow[]>([]);
@@ -275,17 +277,19 @@ export default function ShippingTaxSettingsPage() {
               Matched by the customer&apos;s shipping country. The zone marked Default is used when no exact match is found.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="admin"
-            size="sm"
-            onClick={() => {
-              setFormError(null);
-              setZoneModal({ id: null, values: EMPTY_ZONE });
-            }}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Zone
-          </Button>
+          {can("settings.manage") && (
+            <Button
+              type="button"
+              variant="admin"
+              size="sm"
+              onClick={() => {
+                setFormError(null);
+                setZoneModal({ id: null, values: EMPTY_ZONE });
+              }}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Zone
+            </Button>
+          )}
         </div>
 
         <div className="mt-4">
@@ -325,36 +329,40 @@ export default function ShippingTaxSettingsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              title="Edit"
-                              aria-label="Edit"
-                              onClick={() => {
-                                setFormError(null);
-                                setZoneModal({
-                                  id: zone.id,
-                                  values: {
-                                    country: zone.country,
-                                    label: zone.label,
-                                    rate: zone.rate,
-                                    freeShippingMinOrder: zone.freeShippingMinOrder,
-                                    isDefault: zone.isDefault,
-                                  },
-                                });
-                              }}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              title="Delete"
-                              aria-label="Delete"
-                              onClick={() => setDeleteZoneTarget(zone)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Edit"
+                                aria-label="Edit"
+                                onClick={() => {
+                                  setFormError(null);
+                                  setZoneModal({
+                                    id: zone.id,
+                                    values: {
+                                      country: zone.country,
+                                      label: zone.label,
+                                      rate: zone.rate,
+                                      freeShippingMinOrder: zone.freeShippingMinOrder,
+                                      isDefault: zone.isDefault,
+                                    },
+                                  });
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Delete"
+                                aria-label="Delete"
+                                onClick={() => setDeleteZoneTarget(zone)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -384,36 +392,40 @@ export default function ShippingTaxSettingsPage() {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        title="Edit"
-                        aria-label="Edit"
-                        onClick={() => {
-                          setFormError(null);
-                          setZoneModal({
-                            id: zone.id,
-                            values: {
-                              country: zone.country,
-                              label: zone.label,
-                              rate: zone.rate,
-                              freeShippingMinOrder: zone.freeShippingMinOrder,
-                              isDefault: zone.isDefault,
-                            },
-                          });
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        aria-label="Delete"
-                        onClick={() => setDeleteZoneTarget(zone)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Edit"
+                          aria-label="Edit"
+                          onClick={() => {
+                            setFormError(null);
+                            setZoneModal({
+                              id: zone.id,
+                              values: {
+                                country: zone.country,
+                                label: zone.label,
+                                rate: zone.rate,
+                                freeShippingMinOrder: zone.freeShippingMinOrder,
+                                isDefault: zone.isDefault,
+                              },
+                            });
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label="Delete"
+                          onClick={() => setDeleteZoneTarget(zone)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -431,17 +443,19 @@ export default function ShippingTaxSettingsPage() {
               VAT/tax percent applied to the post-discount amount, by shipping country. Countries with no match pay no tax.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="admin"
-            size="sm"
-            onClick={() => {
-              setFormError(null);
-              setRateModal({ id: null, values: EMPTY_RATE });
-            }}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Tax Rate
-          </Button>
+          {can("settings.manage") && (
+            <Button
+              type="button"
+              variant="admin"
+              size="sm"
+              onClick={() => {
+                setFormError(null);
+                setRateModal({ id: null, values: EMPTY_RATE });
+              }}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Tax Rate
+            </Button>
+          )}
         </div>
 
         <div className="mt-4">
@@ -483,30 +497,34 @@ export default function ShippingTaxSettingsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              title="Edit"
-                              aria-label="Edit"
-                              onClick={() => {
-                                setFormError(null);
-                                setRateModal({
-                                  id: rate.id,
-                                  values: { country: rate.country, label: rate.label, percent: rate.percent, active: rate.active },
-                                });
-                              }}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              title="Delete"
-                              aria-label="Delete"
-                              onClick={() => setDeleteRateTarget(rate)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Edit"
+                                aria-label="Edit"
+                                onClick={() => {
+                                  setFormError(null);
+                                  setRateModal({
+                                    id: rate.id,
+                                    values: { country: rate.country, label: rate.label, percent: rate.percent, active: rate.active },
+                                  });
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Delete"
+                                aria-label="Delete"
+                                onClick={() => setDeleteRateTarget(rate)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -537,30 +555,34 @@ export default function ShippingTaxSettingsPage() {
                       </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        title="Edit"
-                        aria-label="Edit"
-                        onClick={() => {
-                          setFormError(null);
-                          setRateModal({
-                            id: rate.id,
-                            values: { country: rate.country, label: rate.label, percent: rate.percent, active: rate.active },
-                          });
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        aria-label="Delete"
-                        onClick={() => setDeleteRateTarget(rate)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Edit"
+                          aria-label="Edit"
+                          onClick={() => {
+                            setFormError(null);
+                            setRateModal({
+                              id: rate.id,
+                              values: { country: rate.country, label: rate.label, percent: rate.percent, active: rate.active },
+                            });
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label="Delete"
+                          onClick={() => setDeleteRateTarget(rate)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -579,17 +601,19 @@ export default function ShippingTaxSettingsPage() {
               surcharging remote areas. Falls back to the zone above when a municipality has no override.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="admin"
-            size="sm"
-            onClick={() => {
-              setFormError(null);
-              setMunicipalityRateModal({ id: null, values: EMPTY_MUNICIPALITY_RATE });
-            }}
-          >
-            <Plus className="mr-1 h-4 w-4" /> Add Municipality Rate
-          </Button>
+          {can("settings.manage") && (
+            <Button
+              type="button"
+              variant="admin"
+              size="sm"
+              onClick={() => {
+                setFormError(null);
+                setMunicipalityRateModal({ id: null, values: EMPTY_MUNICIPALITY_RATE });
+              }}
+            >
+              <Plus className="mr-1 h-4 w-4" /> Add Municipality Rate
+            </Button>
+          )}
         </div>
 
         <div className="mt-4">
@@ -626,37 +650,41 @@ export default function ShippingTaxSettingsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-right">
                           <div className="flex items-center justify-end gap-1">
-                            <button
-                              type="button"
-                              title="Edit"
-                              aria-label="Edit"
-                              onClick={() => {
-                                setFormError(null);
-                                setMunicipalityRateModal({
-                                  id: rate.id,
-                                  values: {
-                                    provinceId: rate.provinceId,
-                                    districtId: rate.districtId,
-                                    municipalityId: rate.municipalityId,
-                                    label: rate.label ?? "",
-                                    rate: rate.rate,
-                                    freeShippingMinOrder: rate.freeShippingMinOrder,
-                                  },
-                                });
-                              }}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              title="Delete"
-                              aria-label="Delete"
-                              onClick={() => setDeleteMunicipalityRateTarget(rate)}
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Edit"
+                                aria-label="Edit"
+                                onClick={() => {
+                                  setFormError(null);
+                                  setMunicipalityRateModal({
+                                    id: rate.id,
+                                    values: {
+                                      provinceId: rate.provinceId,
+                                      districtId: rate.districtId,
+                                      municipalityId: rate.municipalityId,
+                                      label: rate.label ?? "",
+                                      rate: rate.rate,
+                                      freeShippingMinOrder: rate.freeShippingMinOrder,
+                                    },
+                                  });
+                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </button>
+                            )}
+                            {can("settings.manage") && (
+                              <button
+                                type="button"
+                                title="Delete"
+                                aria-label="Delete"
+                                onClick={() => setDeleteMunicipalityRateTarget(rate)}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -681,37 +709,41 @@ export default function ShippingTaxSettingsPage() {
                       </p>
                     </div>
                     <div className="flex shrink-0 items-center gap-1">
-                      <button
-                        type="button"
-                        title="Edit"
-                        aria-label="Edit"
-                        onClick={() => {
-                          setFormError(null);
-                          setMunicipalityRateModal({
-                            id: rate.id,
-                            values: {
-                              provinceId: rate.provinceId,
-                              districtId: rate.districtId,
-                              municipalityId: rate.municipalityId,
-                              label: rate.label ?? "",
-                              rate: rate.rate,
-                              freeShippingMinOrder: rate.freeShippingMinOrder,
-                            },
-                          });
-                        }}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        title="Delete"
-                        aria-label="Delete"
-                        onClick={() => setDeleteMunicipalityRateTarget(rate)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Edit"
+                          aria-label="Edit"
+                          onClick={() => {
+                            setFormError(null);
+                            setMunicipalityRateModal({
+                              id: rate.id,
+                              values: {
+                                provinceId: rate.provinceId,
+                                districtId: rate.districtId,
+                                municipalityId: rate.municipalityId,
+                                label: rate.label ?? "",
+                                rate: rate.rate,
+                                freeShippingMinOrder: rate.freeShippingMinOrder,
+                              },
+                            });
+                          }}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </button>
+                      )}
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label="Delete"
+                          onClick={() => setDeleteMunicipalityRateTarget(rate)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </div>
                   </li>
                 ))}
@@ -1023,6 +1055,7 @@ export default function ShippingTaxSettingsPage() {
 
 /** Cross-dealer view of every ward-specific shipping override — see AGENTS brief section 30. Creating a new override still happens from the dealer's own page (its ward picker is scoped to that dealer's context); this section is for the at-a-glance overview plus edit/enable/disable/delete. */
 function DealerShippingChargesSection() {
+  const { can } = usePermissions();
   const [rows, setRows] = useState<DealerShippingChargeRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
@@ -1127,15 +1160,17 @@ function DealerShippingChargesSection() {
                       />
                     </td>
                     <td className="px-4 py-3.5 text-right">
-                      <button
-                        type="button"
-                        title="Delete"
-                        aria-label="Delete"
-                        onClick={() => setDeleteTarget(row)}
-                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                      {can("settings.manage") && (
+                        <button
+                          type="button"
+                          title="Delete"
+                          aria-label="Delete"
+                          onClick={() => setDeleteTarget(row)}
+                          className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

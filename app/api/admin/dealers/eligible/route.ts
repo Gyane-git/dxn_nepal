@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, handleApiError } from "@/lib/api";
 
 /** Distributors not yet promoted to Dealer — the only accounts eligible to become one. */
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("dealers.view");
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim();
 

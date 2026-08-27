@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { useAddressBookTree } from "@/hooks/useAddressBookTree";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 /** Sentinel wardNo meaning "the whole city" — see lib/ward.ts CITYWIDE_WARD_NO. Kept as a plain
  * client-side constant here rather than importing the server-only lib, which pulls in Prisma. */
@@ -41,9 +42,14 @@ type Tab = "details" | "cities" | "shipping" | "inventory";
 export default function AdminDealerDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { dealerId: ownDealerId, loading: permissionsLoading } = usePermissions();
   const [dealer, setDealer] = useState<DealerDetail | null>(null);
   const [tab, setTab] = useState<Tab>("details");
   const [notFound, setNotFound] = useState(false);
+
+  // A dealer viewing their own profile only ever manages their inventory quantities — never
+  // their own business details/cities/shipping, and never any other dealer.
+  const isSelfService = !permissionsLoading && ownDealerId != null && String(ownDealerId) === id;
 
   const load = useCallback(() => {
     fetch(`/api/admin/dealers/${id}`)
@@ -56,15 +62,21 @@ export default function AdminDealerDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  useEffect(() => {
+    if (isSelfService) setTab("inventory");
+  }, [isSelfService]);
+
   if (notFound) return <p className="text-sm text-gray-500">Dealer not found.</p>;
   if (!dealer) return <p className="text-sm text-gray-500">Loading...</p>;
 
-  const TABS: { key: Tab; label: string }[] = [
-    { key: "details", label: "Details" },
-    { key: "cities", label: `Cities (${dealer.wardAssignments.length})` },
-    { key: "shipping", label: "Shipping" },
-    { key: "inventory", label: `Inventory (${dealer._count.inventory})` },
-  ];
+  const TABS: { key: Tab; label: string }[] = isSelfService
+    ? [{ key: "inventory", label: `Inventory (${dealer._count.inventory})` }]
+    : [
+        { key: "details", label: "Details" },
+        { key: "cities", label: `Cities (${dealer.wardAssignments.length})` },
+        { key: "shipping", label: "Shipping" },
+        { key: "inventory", label: `Inventory (${dealer._count.inventory})` },
+      ];
 
   return (
     <div className="max-w-4xl">
@@ -102,7 +114,7 @@ export default function AdminDealerDetailPage() {
         {tab === "details" && <DetailsTab dealer={dealer} onSaved={load} />}
         {tab === "cities" && <CitiesTab dealer={dealer} onChanged={load} />}
         {tab === "shipping" && <ShippingTab dealer={dealer} onChanged={load} />}
-        {tab === "inventory" && <InventoryTab dealerId={dealer.id} />}
+        {tab === "inventory" && <InventoryTab dealerId={dealer.id} canAssign={!isSelfService} />}
       </div>
     </div>
   );
@@ -343,14 +355,25 @@ function ShippingTab({ dealer, onChanged }: { dealer: DealerDetail; onChanged: (
   );
 }
 
-function InventoryTab({ dealerId }: { dealerId: number }) {
+interface DealerInventoryItem {
+  productId: number;
+  name: string;
+  sku: string | null;
+  globalStock: number;
+  dealerStock: number;
+  assigned: boolean;
+}
+
+function InventoryTab({ dealerId, canAssign }: { dealerId: number; canAssign: boolean }) {
   const [search, setSearch] = useState("");
-  const [items, setItems] = useState<{ productId: number; name: string; sku: string | null; globalStock: number; dealerStock: number }[]>([]);
+  const [showAssignedOnly, setShowAssignedOnly] = useState(true);
+  const [items, setItems] = useState<DealerInventoryItem[]>([]);
   const [drafts, setDrafts] = useState<Record<number, string>>({});
   const [savingId, setSavingId] = useState<number | null>(null);
+  const [togglingId, setTogglingId] = useState<number | null>(null);
 
   const load = useCallback(() => {
-    const params = new URLSearchParams({ pageSize: "50" });
+    const params = new URLSearchParams({ pageSize: "100" });
     if (search) params.set("search", search);
     fetch(`/api/admin/dealers/${dealerId}/inventory?${params.toString()}`)
       .then((res) => res.json())
@@ -372,34 +395,84 @@ function InventoryTab({ dealerId }: { dealerId: number }) {
     load();
   }
 
+  async function toggleAssigned(productId: number, assigned: boolean) {
+    setTogglingId(productId);
+    await fetch(`/api/admin/dealers/${dealerId}/inventory`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ productId, assigned }),
+    });
+    setTogglingId(null);
+    load();
+  }
+
+  const visibleItems = showAssignedOnly ? items.filter((i) => i.assigned) : items;
+
   return (
     <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-soft">
-      <SearchInput value={search} onChange={setSearch} placeholder="Search products..." className="max-w-xs" />
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search products..." className="max-w-xs" />
+        {canAssign && (
+          <label className="flex items-center gap-2 text-sm text-gray-700">
+            <input
+              type="checkbox"
+              checked={showAssignedOnly}
+              onChange={(e) => setShowAssignedOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-gray-300"
+            />
+            Assigned products only
+          </label>
+        )}
+      </div>
+      <p className="mt-2 text-xs text-gray-500">
+        {canAssign
+          ? "Check “Assigned” to authorize this dealer to sell a product — only assigned products are visible in the dealer's own portal."
+          : "Update how many units you currently have available for each product. Contact an administrator to get more products assigned to you."}
+      </p>
       <table className="mt-4 w-full text-left text-sm">
         <thead className="border-b border-gray-100 text-xs uppercase tracking-wide text-gray-500">
           <tr>
+            {canAssign && <th className="py-2">Assigned</th>}
             <th className="py-2">Product</th>
-            <th className="py-2">Global Stock</th>
+            {canAssign && <th className="py-2">Global Stock</th>}
             <th className="py-2">Dealer Stock</th>
             <th className="py-2"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-100">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <tr key={item.productId}>
+              {canAssign && (
+                <td className="py-2">
+                  <input
+                    type="checkbox"
+                    checked={item.assigned}
+                    disabled={togglingId === item.productId}
+                    onChange={(e) => toggleAssigned(item.productId, e.target.checked)}
+                    className="h-4 w-4 rounded border-gray-300"
+                  />
+                </td>
+              )}
               <td className="py-2 font-medium text-gray-900">{item.name}</td>
-              <td className="py-2 text-gray-500">{item.globalStock}</td>
+              {canAssign && <td className="py-2 text-gray-500">{item.globalStock}</td>}
               <td className="py-2">
                 <input
                   type="number"
                   min={0}
+                  disabled={!item.assigned}
                   value={drafts[item.productId] ?? item.dealerStock}
                   onChange={(e) => setDrafts((prev) => ({ ...prev, [item.productId]: e.target.value }))}
-                  className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-sm outline-none focus:border-slate-400"
+                  className="w-20 rounded-lg border border-gray-200 px-2 py-1 text-sm outline-none focus:border-slate-400 disabled:bg-gray-50 disabled:text-gray-400"
                 />
               </td>
               <td className="py-2">
-                <Button size="sm" variant="adminOutline" isLoading={savingId === item.productId} onClick={() => saveStock(item.productId)}>
+                <Button
+                  size="sm"
+                  variant="adminOutline"
+                  disabled={!item.assigned}
+                  isLoading={savingId === item.productId}
+                  onClick={() => saveStock(item.productId)}
+                >
                   Save
                 </Button>
               </td>
@@ -407,7 +480,11 @@ function InventoryTab({ dealerId }: { dealerId: number }) {
           ))}
         </tbody>
       </table>
-      {items.length === 0 && <p className="mt-4 text-center text-sm text-gray-500">No products found.</p>}
+      {visibleItems.length === 0 && (
+        <p className="mt-4 text-center text-sm text-gray-500">
+          {showAssignedOnly ? "No products assigned yet." : "No products found."}
+        </p>
+      )}
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { fail, handleApiError } from "@/lib/api";
 import { renderInvoicePdf } from "@/lib/invoice";
 
@@ -7,13 +7,16 @@ export const runtime = "nodejs";
 
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("orders.view");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid order id");
 
     const order = await prisma.order.findUnique({ where: { id }, include: { items: true } });
     if (!order) return fail(404, "Order not found");
+    if (!admin.isSuperAdmin && admin.dealerId != null && order.dealerId !== admin.dealerId) {
+      return fail(404, "Order not found");
+    }
 
     const buffer = await renderInvoicePdf({
       orderNumber: order.orderNumber,

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 
 /**
@@ -10,7 +10,7 @@ import { ok, fail, handleApiError } from "@/lib/api";
  */
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("dealers.view");
     const { searchParams } = new URL(request.url);
     const municipalityId = Number(searchParams.get("municipalityId"));
     if (!municipalityId) return fail(400, "municipalityId is required");

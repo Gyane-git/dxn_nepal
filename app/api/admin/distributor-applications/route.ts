@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("distributors.view");
     const { searchParams } = new URL(request.url);
     const status = searchParams.get("status");
     const { page, pageSize, skip } = parsePagination(searchParams);

@@ -42,6 +42,10 @@ function LoginForm() {
       );
       return;
     }
+    if (result?.error === "ACCOUNT_DISABLED") {
+      setFormError("This account has been disabled. Please contact an administrator.");
+      return;
+    }
     if (result?.error) {
       setFormError("Invalid email or password");
       return;

@@ -9,6 +9,7 @@ import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
 import { BulkActionBar } from "@/components/admin/BulkActionBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface ProductRow {
   id: string;
@@ -33,6 +34,7 @@ interface Option {
 const PAGE_SIZE = 20;
 
 export default function ProductsPage() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [brandId, setBrandId] = useState("");
@@ -132,9 +134,11 @@ export default function ProductsPage() {
           <Link href="/admin/products/trash">
             <Button variant="adminOutline" size="sm">Trash</Button>
           </Link>
-          <Link href="/admin/products/new">
-            <Button variant="admin" size="sm">New Product</Button>
-          </Link>
+          {can("products.create") && (
+            <Link href="/admin/products/new">
+              <Button variant="admin" size="sm">New Product</Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -173,12 +177,16 @@ export default function ProductsPage() {
           onClear={() => setSelectedIds(new Set())}
           onAction={handleBulkAction}
           actions={[
-            { key: "publish", label: "Publish" },
-            { key: "unpublish", label: "Unpublish" },
-            { key: "archive", label: "Archive" },
-            { key: "feature", label: "Feature" },
-            { key: "unfeature", label: "Unfeature" },
-            { key: "delete", label: "Delete", variant: "danger" },
+            ...(can("products.edit")
+              ? [
+                  { key: "publish", label: "Publish" },
+                  { key: "unpublish", label: "Unpublish" },
+                  { key: "archive", label: "Archive" },
+                  { key: "feature", label: "Feature" },
+                  { key: "unfeature", label: "Unfeature" },
+                ]
+              : []),
+            ...(can("products.delete") ? [{ key: "delete", label: "Delete", variant: "danger" as const }] : []),
           ]}
         />
       </div>
@@ -211,17 +219,31 @@ export default function ProductsPage() {
                         <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-gray-300" />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600">
-                          {p.images[0]?.url && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
-                          )}
-                          <span>
-                            {p.name}
-                            {p.isFeatured && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
-                            {p._count.variants > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{p._count.variants} variants</span>}
+                        {can("products.edit") ? (
+                          <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600">
+                            {p.images[0]?.url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                            )}
+                            <span>
+                              {p.name}
+                              {p.isFeatured && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
+                              {p._count.variants > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{p._count.variants} variants</span>}
+                            </span>
+                          </Link>
+                        ) : (
+                          <span className="flex items-center gap-3 font-medium text-gray-900">
+                            {p.images[0]?.url && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                            )}
+                            <span>
+                              {p.name}
+                              {p.isFeatured && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
+                              {p._count.variants > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{p._count.variants} variants</span>}
+                            </span>
                           </span>
-                        </Link>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{p.sku}</td>
                       <td className="px-4 py-3 text-gray-500">{p.category?.name}</td>
@@ -230,32 +252,38 @@ export default function ProductsPage() {
                       <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/products/${p.id}`}
-                            title="Edit"
-                            aria-label="Edit"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDuplicate(p.id)}
-                            title="Duplicate"
-                            aria-label="Duplicate"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                          >
-                            <Copy className="h-4 w-4" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(p.id)}
-                            title="Move to trash"
-                            aria-label="Move to trash"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {can("products.edit") && (
+                            <Link
+                              href={`/admin/products/${p.id}`}
+                              title="Edit"
+                              aria-label="Edit"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          )}
+                          {can("products.create") && (
+                            <button
+                              type="button"
+                              onClick={() => handleDuplicate(p.id)}
+                              title="Duplicate"
+                              aria-label="Duplicate"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                            >
+                              <Copy className="h-4 w-4" />
+                            </button>
+                          )}
+                          {can("products.delete") && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(p.id)}
+                              title="Move to trash"
+                              aria-label="Move to trash"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -267,17 +295,27 @@ export default function ProductsPage() {
               {rows.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 px-4 py-3">
                   <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 shrink-0 rounded border-gray-300" />
-                  <Link href={`/admin/products/${p.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{p.name}</Link>
+                  {can("products.edit") ? (
+                    <Link href={`/admin/products/${p.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{p.name}</Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{p.name}</span>
+                  )}
                   <StatusBadge status={p.status} />
-                  <Link href={`/admin/products/${p.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                  <button type="button" onClick={() => handleDuplicate(p.id)} title="Duplicate" aria-label="Duplicate" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-                    <Copy className="h-4 w-4" />
-                  </button>
-                  <button type="button" onClick={() => setDeleteTarget(p.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {can("products.edit") && (
+                    <Link href={`/admin/products/${p.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {can("products.create") && (
+                    <button type="button" onClick={() => handleDuplicate(p.id)} title="Duplicate" aria-label="Duplicate" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
+                      <Copy className="h-4 w-4" />
+                    </button>
+                  )}
+                  {can("products.delete") && (
+                    <button type="button" onClick={() => setDeleteTarget(p.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
-import { BulkActionBar } from "@/components/admin/BulkActionBar";
+import { BulkActionBar, type BulkAction } from "@/components/admin/BulkActionBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface BrandRow {
   id: string;
@@ -23,6 +24,7 @@ interface BrandRow {
 const PAGE_SIZE = 20;
 
 export default function BrandsPage() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -98,9 +100,11 @@ export default function BrandsPage() {
           <Link href="/admin/brands/trash">
             <Button variant="adminOutline" size="sm">Trash</Button>
           </Link>
-          <Link href="/admin/brands/new">
-            <Button variant="admin" size="sm">New Brand</Button>
-          </Link>
+          {can("brands.create") && (
+            <Link href="/admin/brands/new">
+              <Button variant="admin" size="sm">New Brand</Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -123,11 +127,11 @@ export default function BrandsPage() {
           isBusy={isBusy}
           onClear={() => setSelectedIds(new Set())}
           onAction={handleBulkAction}
-          actions={[
+          actions={([
             { key: "enable", label: "Enable" },
             { key: "disable", label: "Disable" },
             { key: "delete", label: "Delete", variant: "danger" },
-          ]}
+          ] as BulkAction[]).filter((a) => (a.key === "delete" ? can("brands.delete") : can("brands.edit")))}
         />
       </div>
 
@@ -156,36 +160,51 @@ export default function BrandsPage() {
                         <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 rounded border-gray-300" />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/brands/${b.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600">
-                          {b.logo && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={b.logo} alt="" className="h-8 w-8 rounded-full object-cover" />
-                          )}
-                          {b.name}
-                          {b.isFeatured && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
-                        </Link>
+                        {can("brands.edit") ? (
+                          <Link href={`/admin/brands/${b.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600">
+                            {b.logo && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={b.logo} alt="" className="h-8 w-8 rounded-full object-cover" />
+                            )}
+                            {b.name}
+                            {b.isFeatured && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
+                          </Link>
+                        ) : (
+                          <span className="flex items-center gap-3 font-medium text-gray-900">
+                            {b.logo && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={b.logo} alt="" className="h-8 w-8 rounded-full object-cover" />
+                            )}
+                            {b.name}
+                            {b.isFeatured && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{b._count.products}</td>
                       <td className="px-4 py-3"><StatusBadge status={b.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/brands/${b.id}`}
-                            title="Edit"
-                            aria-label="Edit"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(b.id)}
-                            title="Move to trash"
-                            aria-label="Move to trash"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {can("brands.edit") && (
+                            <Link
+                              href={`/admin/brands/${b.id}`}
+                              title="Edit"
+                              aria-label="Edit"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          )}
+                          {can("brands.delete") && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(b.id)}
+                              title="Move to trash"
+                              aria-label="Move to trash"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -197,19 +216,32 @@ export default function BrandsPage() {
               {rows.map((b) => (
                 <li key={b.id} className="flex items-center gap-3 px-4 py-3">
                   <input type="checkbox" checked={selectedIds.has(b.id)} onChange={() => toggleSelect(b.id)} className="h-4 w-4 shrink-0 rounded border-gray-300" />
-                  <Link href={`/admin/brands/${b.id}`} className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate text-sm font-medium text-gray-900">{b.name}</span>
-                    {b.isFeatured && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>
-                    )}
-                  </Link>
+                  {can("brands.edit") ? (
+                    <Link href={`/admin/brands/${b.id}`} className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="truncate text-sm font-medium text-gray-900">{b.name}</span>
+                      {b.isFeatured && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>
+                      )}
+                    </Link>
+                  ) : (
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className="truncate text-sm font-medium text-gray-900">{b.name}</span>
+                      {b.isFeatured && (
+                        <span className="shrink-0 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>
+                      )}
+                    </span>
+                  )}
                   <StatusBadge status={b.status} />
-                  <Link href={`/admin/brands/${b.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                  <button type="button" onClick={() => setDeleteTarget(b.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {can("brands.edit") && (
+                    <Link href={`/admin/brands/${b.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {can("brands.delete") && (
+                    <button type="button" onClick={() => setDeleteTarget(b.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { returnActionSchema } from "@/schemas/admin-order";
 import { notify } from "@/lib/notify";
@@ -10,13 +10,16 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("orders.edit");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid order id");
 
     const order = await prisma.order.findUnique({ where: { id } });
     if (!order) return fail(404, "Order not found");
+    if (!admin.isSuperAdmin && admin.dealerId != null && order.dealerId !== admin.dealerId) {
+      return fail(404, "Order not found");
+    }
     if (order.status !== "DELIVERED" || !order.returnRequested) {
       return fail(400, "This order has no pending return request");
     }

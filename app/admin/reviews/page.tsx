@@ -7,6 +7,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 type ReviewStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -34,6 +35,7 @@ function StarRow({ rating }: { rating: number }) {
 }
 
 export default function AdminReviewsPage() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -153,7 +155,7 @@ export default function AdminReviewsPage() {
                       <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          {r.status !== "APPROVED" && (
+                          {can("reviews.approve") && r.status !== "APPROVED" && (
                             <button
                               type="button"
                               onClick={() => updateStatus(r.id, "APPROVED")}
@@ -165,7 +167,7 @@ export default function AdminReviewsPage() {
                               <Check className="h-4 w-4" />
                             </button>
                           )}
-                          {r.status !== "REJECTED" && (
+                          {can("reviews.approve") && r.status !== "REJECTED" && (
                             <button
                               type="button"
                               onClick={() => updateStatus(r.id, "REJECTED")}
@@ -177,15 +179,17 @@ export default function AdminReviewsPage() {
                               <X className="h-4 w-4" />
                             </button>
                           )}
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(r.id)}
-                            title="Delete"
-                            aria-label="Delete"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {can("reviews.delete") && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(r.id)}
+                              title="Delete"
+                              aria-label="Delete"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -206,7 +210,7 @@ export default function AdminReviewsPage() {
                   <div className="mt-2"><StarRow rating={r.rating} /></div>
                   <p className="mt-2 line-clamp-2 text-sm text-gray-600">{r.comment}</p>
                   <div className="mt-3 flex items-center gap-1">
-                    {r.status !== "APPROVED" && (
+                    {can("reviews.approve") && r.status !== "APPROVED" && (
                       <button
                         type="button"
                         onClick={() => updateStatus(r.id, "APPROVED")}
@@ -218,7 +222,7 @@ export default function AdminReviewsPage() {
                         <Check className="h-4 w-4" />
                       </button>
                     )}
-                    {r.status !== "REJECTED" && (
+                    {can("reviews.approve") && r.status !== "REJECTED" && (
                       <button
                         type="button"
                         onClick={() => updateStatus(r.id, "REJECTED")}
@@ -230,15 +234,17 @@ export default function AdminReviewsPage() {
                         <X className="h-4 w-4" />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => setDeleteTarget(r.id)}
-                      title="Delete"
-                      aria-label="Delete"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    {can("reviews.delete") && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(r.id)}
+                        title="Delete"
+                        aria-label="Delete"
+                        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    )}
                   </div>
                 </li>
               ))}

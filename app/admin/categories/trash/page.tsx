@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface TrashedCategory {
   id: string;
@@ -13,6 +14,7 @@ interface TrashedCategory {
 }
 
 export default function CategoryTrashPage() {
+  const { can } = usePermissions();
   const [categories, setCategories] = useState<TrashedCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [permanentTarget, setPermanentTarget] = useState<string | null>(null);
@@ -79,12 +81,16 @@ export default function CategoryTrashPage() {
                   <p className="truncate text-xs text-gray-400">/{c.slug}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="adminOutline" disabled={isBusy} onClick={() => restore(c.id)}>
-                    Restore
-                  </Button>
-                  <Button size="sm" variant="danger" disabled={isBusy} onClick={() => setPermanentTarget(c.id)}>
-                    Delete permanently
-                  </Button>
+                  {can("categories.edit") && (
+                    <Button size="sm" variant="adminOutline" disabled={isBusy} onClick={() => restore(c.id)}>
+                      Restore
+                    </Button>
+                  )}
+                  {can("categories.delete") && (
+                    <Button size="sm" variant="danger" disabled={isBusy} onClick={() => setPermanentTarget(c.id)}>
+                      Delete permanently
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}

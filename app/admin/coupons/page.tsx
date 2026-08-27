@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface CouponRow {
   id: number;
@@ -34,6 +35,7 @@ function formatExpiry(value: string | null) {
 }
 
 export default function CouponsPage() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState("");
   const [active, setActive] = useState("");
   const [page, setPage] = useState(1);
@@ -103,9 +105,11 @@ export default function CouponsPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Coupons</h1>
           <p className="mt-1 text-sm text-gray-500">Manage discount coupons used at checkout.</p>
         </div>
-        <Link href="/admin/coupons/new">
-          <Button variant="admin" size="sm">New Coupon</Button>
-        </Link>
+        {can("coupons.create") && (
+          <Link href="/admin/coupons/new">
+            <Button variant="admin" size="sm">New Coupon</Button>
+          </Link>
+        )}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
@@ -144,9 +148,13 @@ export default function CouponsPage() {
                   {rows.map((c) => (
                     <tr key={c.id}>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/coupons/${c.id}`} className="font-medium text-gray-900 hover:text-slate-600">
-                          {c.code}
-                        </Link>
+                        {can("coupons.edit") ? (
+                          <Link href={`/admin/coupons/${c.id}`} className="font-medium text-gray-900 hover:text-slate-600">
+                            {c.code}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-900">{c.code}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-700">{formatDiscount(c)}</td>
                       <td className="px-4 py-3 text-gray-500">{formatMinOrder(c.minOrderAmount)}</td>
@@ -163,23 +171,27 @@ export default function CouponsPage() {
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/coupons/${c.id}`}
-                            title="Edit"
-                            aria-label="Edit"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => { setDeleteTarget(c.id); setDeleteError(null); }}
-                            title="Delete"
-                            aria-label="Delete"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {can("coupons.edit") && (
+                            <Link
+                              href={`/admin/coupons/${c.id}`}
+                              title="Edit"
+                              aria-label="Edit"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          )}
+                          {can("coupons.delete") && (
+                            <button
+                              type="button"
+                              onClick={() => { setDeleteTarget(c.id); setDeleteError(null); }}
+                              title="Delete"
+                              aria-label="Delete"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -197,15 +209,23 @@ export default function CouponsPage() {
                     className="h-4 w-4 rounded border-gray-300 text-slate-700 focus:ring-slate-400"
                   />
                   <div className="flex-1">
-                    <Link href={`/admin/coupons/${c.id}`} className="text-sm font-medium text-gray-900">{c.code}</Link>
+                    {can("coupons.edit") ? (
+                      <Link href={`/admin/coupons/${c.id}`} className="text-sm font-medium text-gray-900">{c.code}</Link>
+                    ) : (
+                      <span className="text-sm font-medium text-gray-900">{c.code}</span>
+                    )}
                     <p className="text-xs text-gray-500">{formatDiscount(c)} · {formatExpiry(c.expiresAt)}</p>
                   </div>
-                  <Link href={`/admin/coupons/${c.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                  <button type="button" onClick={() => { setDeleteTarget(c.id); setDeleteError(null); }} title="Delete" aria-label="Delete" className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {can("coupons.edit") && (
+                    <Link href={`/admin/coupons/${c.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {can("coupons.delete") && (
+                    <button type="button" onClick={() => { setDeleteTarget(c.id); setDeleteError(null); }} title="Delete" aria-label="Delete" className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

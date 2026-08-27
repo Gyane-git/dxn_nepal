@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { generateVariantSku } from "@/lib/sku";
 import { generateVariantsSchema } from "@/schemas/admin-variant";
@@ -13,7 +13,10 @@ function cartesian<T>(groups: T[][]): T[][] {
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.edit");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot modify central products");
+    }
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid product id");

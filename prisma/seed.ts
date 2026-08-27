@@ -2,6 +2,7 @@ import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcryptjs";
 import fs from "fs/promises";
 import path from "path";
+import { PERMISSIONS, ALL_PERMISSION_KEYS, DEALER_PORTAL_PERMISSION_KEYS } from "../lib/permissions";
 
 const prisma = new PrismaClient();
 
@@ -204,12 +205,104 @@ const PRODUCT_TEMPLATES: ProductTemplate[] = [
   })),
 ];
 
+/**
+ * Seeds the RBAC permission catalog and a handful of starter admin roles. The seeded Super
+ * Admin role is idempotently linked to admin@dxn.com below (seedAdminAndCoupon), but that link
+ * is cosmetic only — requireAdmin() already treats adminRoleId==null as full access, so no
+ * existing admin can ever be locked out by this seed running (or not running).
+ */
+async function seedRbac(): Promise<{ superAdminId: number }> {
+  for (const perm of PERMISSIONS) {
+    await prisma.permission.upsert({
+      where: { key: perm.key },
+      update: { module: perm.module, action: perm.action, label: perm.label },
+      create: perm,
+    });
+  }
+  console.log(`Seeded ${PERMISSIONS.length} permissions`);
+
+  async function upsertRole(name: string, description: string, keys: string[], flags: { isSuperAdmin?: boolean; isSystem?: boolean } = {}) {
+    const role = await prisma.adminRole.upsert({
+      where: { name },
+      update: { description, isSuperAdmin: flags.isSuperAdmin ?? false, isSystem: flags.isSystem ?? false },
+      create: { name, description, isSuperAdmin: flags.isSuperAdmin ?? false, isSystem: flags.isSystem ?? false },
+    });
+    await prisma.adminRolePermission.deleteMany({ where: { roleId: role.id } });
+    const permissions = await prisma.permission.findMany({ where: { key: { in: keys } } });
+    await prisma.adminRolePermission.createMany({
+      data: permissions.map((p) => ({ roleId: role.id, permissionId: p.id })),
+    });
+    return role;
+  }
+
+  const superAdmin = await upsertRole("Super Admin", "Full, unrestricted access to every module.", ALL_PERMISSION_KEYS, {
+    isSuperAdmin: true,
+    isSystem: true,
+  });
+
+  const has = (mod: string, actions: string[]) => actions.map((a) => `${mod}.${a}`);
+  await upsertRole(
+    "Admin",
+    "Broad operational access, excluding role and user management.",
+    ALL_PERMISSION_KEYS.filter((k) => !k.startsWith("roles.") && !k.startsWith("users.")),
+  );
+  await upsertRole("Manager", "Manage catalog, orders and marketing content; no deletes or settings.", [
+    ...has("dashboard", ["view"]),
+    ...has("categories", ["view", "create", "edit"]),
+    ...has("brands", ["view", "create", "edit"]),
+    ...has("attributes", ["view", "create", "edit"]),
+    ...has("products", ["view", "create", "edit", "export"]),
+    ...has("orders", ["view", "edit", "export"]),
+    ...has("coupons", ["view", "create", "edit"]),
+    ...has("banners", ["view", "create", "edit"]),
+    ...has("reviews", ["view", "approve"]),
+    ...has("distributors", ["view"]),
+    ...has("dealers", ["view", "create", "edit"]),
+    ...has("settings", ["view"]),
+  ]);
+  await upsertRole("Staff", "View-only access plus order updates.", [
+    ...has("dashboard", ["view"]),
+    ...has("categories", ["view"]),
+    ...has("brands", ["view"]),
+    ...has("attributes", ["view"]),
+    ...has("products", ["view"]),
+    ...has("orders", ["view", "edit"]),
+    ...has("coupons", ["view"]),
+    ...has("banners", ["view"]),
+    ...has("reviews", ["view"]),
+    ...has("distributors", ["view"]),
+    ...has("dealers", ["view"]),
+  ]);
+  await upsertRole(
+    "Dealer",
+    "Limited admin-panel access for internal dealer-facing staff (unrelated to the storefront Distributor/Dealer portal).",
+    [...has("dashboard", ["view"]), ...has("orders", ["view", "edit"]), ...has("dealers", ["view"])],
+  );
+  await upsertRole(
+    "Dealer Portal Access",
+    "Assignable to a Dealer record (not an admin user) — governs what that dealer can see/do in their own account/dealer-* portal.",
+    DEALER_PORTAL_PERMISSION_KEYS,
+  );
+
+  console.log("Seeded admin roles: Super Admin, Admin, Manager, Staff, Dealer, Dealer Portal Access");
+  return { superAdminId: superAdmin.id };
+}
+
 async function seedAdminAndCoupon() {
+  const { superAdminId } = await seedRbac();
+
   const passwordHash = await bcrypt.hash("Admin@123", 10);
   await prisma.user.upsert({
     where: { email: "admin@dxn.com" },
-    update: { name: "Store Admin" },
-    create: { name: "Store Admin", email: "admin@dxn.com", passwordHash, role: "ADMIN" },
+    update: { name: "Store Admin", adminRoleId: superAdminId, status: "ACTIVE" },
+    create: {
+      name: "Store Admin",
+      email: "admin@dxn.com",
+      passwordHash,
+      role: "ADMIN",
+      adminRoleId: superAdminId,
+      status: "ACTIVE",
+    },
   });
   console.log("Seeded admin user: admin@dxn.com / Admin@123");
 

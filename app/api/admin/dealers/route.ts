@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
 import { recordAudit } from "@/lib/audit";
@@ -17,11 +17,24 @@ const createDealerSchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("dealers.view");
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim();
     const status = searchParams.get("status");
     const { page, pageSize, skip } = parsePagination(searchParams);
+
+    // A login linked to one specific Dealer (see Dealer.userId) may only ever see that dealer —
+    // never the full list — regardless of its role's `dealers.view` grant. Super Admin is exempt.
+    if (!admin.isSuperAdmin && admin.dealerId != null) {
+      const dealer = await prisma.dealer.findUnique({
+        where: { id: admin.dealerId },
+        include: {
+          user: { select: { id: true, name: true, email: true, distributorId: true } },
+          _count: { select: { wardAssignments: true, inventory: true, orders: true } },
+        },
+      });
+      return ok({ dealers: dealer ? [dealer] : [], total: dealer ? 1 : 0, page: 1, pageSize });
+    }
 
     const where = {
       ...(status ? { status: status as "ACTIVE" | "INACTIVE" } : {}),
@@ -60,7 +73,7 @@ export async function GET(request: Request) {
 /** A Dealer is normally standalone; passing `userId` optionally backs it with an approved Distributor account instead (grants that account dealer-portal access) — never a duplicate identity. */
 export async function POST(request: Request) {
   try {
-    const admin = await requireAdmin();
+    const admin = await requirePermission("dealers.create");
     const body = await request.json();
     const parsed = createDealerSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

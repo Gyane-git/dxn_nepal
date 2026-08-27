@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { shippingZoneSchema } from "@/schemas/admin-settings";
 
@@ -13,7 +13,7 @@ function serialize(zone: { rate: unknown; freeShippingMinOrder: unknown; [key: s
 
 export async function GET() {
   try {
-    await requireAdmin();
+    await requirePermission("settings.view");
     const zones = await prisma.shippingZone.findMany({ orderBy: [{ isDefault: "asc" }, { country: "asc" }] });
     return ok(zones.map(serialize));
   } catch (error) {
@@ -23,7 +23,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("settings.manage");
     const body = await request.json();
     const parsed = shippingZoneSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

@@ -1,16 +1,23 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { productBulkActionSchema } from "@/schemas/admin-product";
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.edit");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot modify central products");
+    }
     const body = await request.json();
     const parsed = productBulkActionSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
 
     const { ids, action } = parsed.data;
+
+    if (action === "delete") {
+      await requirePermission("products.delete");
+    }
 
     switch (action) {
       case "delete":

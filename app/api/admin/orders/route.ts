@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, handleApiError } from "@/lib/api";
 import type { OrderStatus, PaymentStatus, PaymentMethod, Prisma } from "@prisma/client";
 
@@ -9,7 +9,7 @@ const VALID_PAYMENT_METHODS: PaymentMethod[] = ["COD", "ONLINE"];
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("orders.view");
     const { searchParams } = new URL(request.url);
 
     const status = searchParams.get("status");
@@ -21,7 +21,12 @@ export async function GET(request: Request) {
     const page = Math.max(1, Number(searchParams.get("page")) || 1);
     const pageSize = Math.min(100, Math.max(1, Number(searchParams.get("pageSize")) || 20));
 
+    // A dealer-linked login (see Dealer.userId) may only ever see orders assigned to its own
+    // dealer — never another dealer's, regardless of any filters it passes. Super Admin is exempt.
+    const scopedDealerId = !admin.isSuperAdmin ? admin.dealerId : null;
+
     const where: Prisma.OrderWhereInput = {
+      ...(scopedDealerId != null ? { dealerId: scopedDealerId } : {}),
       ...(status && VALID_STATUSES.includes(status as OrderStatus) ? { status: status as OrderStatus } : {}),
       ...(paymentStatus && VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus)
         ? { paymentStatus: paymentStatus as PaymentStatus }

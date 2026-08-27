@@ -1,11 +1,11 @@
-import { requireAdmin, ApiError } from "@/lib/session";
+import { requirePermission, ApiError } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { sendMail, MailNotConfiguredError } from "@/lib/mail";
 import { testEmailSchema } from "@/schemas/admin-settings";
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("settings.manage");
     const body = await request.json();
     const parsed = testEmailSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

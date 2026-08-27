@@ -7,8 +7,9 @@ import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
-import { BulkActionBar } from "@/components/admin/BulkActionBar";
+import { BulkActionBar, type BulkAction } from "@/components/admin/BulkActionBar";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface CategoryRow {
   id: string;
@@ -24,6 +25,7 @@ interface CategoryRow {
 const PAGE_SIZE = 20;
 
 export default function CategoriesPage() {
+  const { can } = usePermissions();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -99,9 +101,11 @@ export default function CategoriesPage() {
           <Link href="/admin/categories/trash">
             <Button variant="adminOutline" size="sm">Trash</Button>
           </Link>
-          <Link href="/admin/categories/new">
-            <Button variant="admin" size="sm">New Category</Button>
-          </Link>
+          {can("categories.create") && (
+            <Link href="/admin/categories/new">
+              <Button variant="admin" size="sm">New Category</Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -124,11 +128,11 @@ export default function CategoriesPage() {
           isBusy={isBusy}
           onClear={() => setSelectedIds(new Set())}
           onAction={handleBulkAction}
-          actions={[
+          actions={([
             { key: "enable", label: "Enable" },
             { key: "disable", label: "Disable" },
             { key: "delete", label: "Delete", variant: "danger" },
-          ]}
+          ] as BulkAction[]).filter((a) => (a.key === "delete" ? can("categories.delete") : can("categories.edit")))}
         />
       </div>
 
@@ -158,32 +162,40 @@ export default function CategoriesPage() {
                         <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="h-4 w-4 rounded border-gray-300" />
                       </td>
                       <td className="px-4 py-3">
-                        <Link href={`/admin/categories/${c.id}`} className="font-medium text-gray-900 hover:text-slate-600">
-                          {c.name}
-                        </Link>
+                        {can("categories.edit") ? (
+                          <Link href={`/admin/categories/${c.id}`} className="font-medium text-gray-900 hover:text-slate-600">
+                            {c.name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-gray-900">{c.name}</span>
+                        )}
                       </td>
                       <td className="px-4 py-3 text-gray-500">{c.parent?.name ?? "—"}</td>
                       <td className="px-4 py-3 text-gray-500">{c._count.products}</td>
                       <td className="px-4 py-3"><StatusBadge status={c.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-1">
-                          <Link
-                            href={`/admin/categories/${c.id}`}
-                            title="Edit"
-                            aria-label="Edit"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Link>
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(c.id)}
-                            title="Move to trash"
-                            aria-label="Move to trash"
-                            className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
+                          {can("categories.edit") && (
+                            <Link
+                              href={`/admin/categories/${c.id}`}
+                              title="Edit"
+                              aria-label="Edit"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          )}
+                          {can("categories.delete") && (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(c.id)}
+                              title="Move to trash"
+                              aria-label="Move to trash"
+                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -195,14 +207,22 @@ export default function CategoriesPage() {
               {rows.map((c) => (
                 <li key={c.id} className="flex items-center gap-3 px-4 py-3">
                   <input type="checkbox" checked={selectedIds.has(c.id)} onChange={() => toggleSelect(c.id)} className="h-4 w-4 shrink-0 rounded border-gray-300" />
-                  <Link href={`/admin/categories/${c.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{c.name}</Link>
+                  {can("categories.edit") ? (
+                    <Link href={`/admin/categories/${c.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{c.name}</Link>
+                  ) : (
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{c.name}</span>
+                  )}
                   <StatusBadge status={c.status} />
-                  <Link href={`/admin/categories/${c.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
-                    <Pencil className="h-4 w-4" />
-                  </Link>
-                  <button type="button" onClick={() => setDeleteTarget(c.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {can("categories.edit") && (
+                    <Link href={`/admin/categories/${c.id}`} title="Edit" aria-label="Edit" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
+                      <Pencil className="h-4 w-4" />
+                    </Link>
+                  )}
+                  {can("categories.delete") && (
+                    <button type="button" onClick={() => setDeleteTarget(c.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>

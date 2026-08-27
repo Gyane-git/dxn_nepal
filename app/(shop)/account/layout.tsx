@@ -19,9 +19,14 @@ export default async function AccountLayout({ children }: LayoutProps<"/account"
           My Addresses
         </Link>
         {dealer && (
-          <Link href="/account/dealer-orders" className="shrink-0 whitespace-nowrap px-3 py-2 hover:text-primary-600">
-            Dealer Orders
-          </Link>
+          <>
+            <Link href="/account/dealer-orders" className="shrink-0 whitespace-nowrap px-3 py-2 hover:text-primary-600">
+              Dealer Orders
+            </Link>
+            <Link href="/account/dealer-inventory" className="shrink-0 whitespace-nowrap px-3 py-2 hover:text-primary-600">
+              My Inventory
+            </Link>
+          </>
         )}
       </nav>
       {children}

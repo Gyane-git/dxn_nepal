@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireDealer } from "@/lib/session";
+import { requireDealerPermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { notify } from "@/lib/notify";
 import { sendMailBestEffort, orderStatusUpdateEmail } from "@/lib/mail";
@@ -13,7 +13,7 @@ const shipSchema = z.object({
 /** A dealer may mark PROCESSING as SHIPPED for orders assigned to them — nothing else. All other transitions (delivered, cancelled, returned) stay admin-only. */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { dealer } = await requireDealer();
+    const { dealer } = await requireDealerPermission("orders.edit");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid order id");

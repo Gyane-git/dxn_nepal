@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
 import { ensureUniqueSlug } from "@/lib/slug";
@@ -11,7 +11,7 @@ import { productSchema } from "@/schemas/admin-product";
 
 export async function GET(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.view");
     const { searchParams } = new URL(request.url);
 
     const search = searchParams.get("search")?.trim();
@@ -25,14 +25,29 @@ export async function GET(request: Request) {
     const trashed = searchParams.get("trashed") === "true";
     const { page, pageSize, skip } = parsePagination(searchParams);
 
+    // A dealer-linked login (see Dealer.userId) may only ever browse products actually assigned
+    // to their dealer, and — matching the same rule their own inventory view enforces — only
+    // currently PUBLISHED ones (an archived/draft product isn't sellable, so it isn't shown even
+    // if it was assigned in the past). This ignores any `status`/`trashed` query params entirely
+    // rather than letting a dealer browse drafts/archived/trashed central products.
+    const scopedDealerId = !admin.isSuperAdmin ? admin.dealerId : null;
+    const isDealerScoped = scopedDealerId != null;
+
     const where: Prisma.ProductWhereInput = {
-      deletedAt: trashed ? { not: null } : null,
+      deletedAt: isDealerScoped ? null : trashed ? { not: null } : null,
       ...(categoryId ? { categoryId } : {}),
       ...(brandId ? { brandId } : {}),
-      ...(status ? { status: status as "DRAFT" | "PUBLISHED" | "ARCHIVED" } : {}),
+      ...(isDealerScoped ? { status: "PUBLISHED" } : status ? { status: status as "DRAFT" | "PUBLISHED" | "ARCHIVED" } : {}),
       ...(stockStatus ? { stockStatus: stockStatus as "IN_STOCK" | "OUT_OF_STOCK" | "ON_BACKORDER" } : {}),
       ...(featured === "true" ? { isFeatured: true } : {}),
       ...(search ? { OR: [{ name: { contains: search } }, { sku: { contains: search } }] } : {}),
+      ...(scopedDealerId != null
+        ? {
+            dealerInventory: {
+              some: { dealerId: scopedDealerId, status: "ACTIVE" as const },
+            },
+          }
+        : {}),
     };
 
     const [products, total] = await Promise.all([
@@ -66,7 +81,10 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.create");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot create central products");
+    }
     const body = await request.json();
     const parsed = productSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

@@ -5,6 +5,7 @@ import { Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface AttributeValue {
   id: string;
@@ -29,6 +30,7 @@ interface ValueDraft {
 const EMPTY_DRAFT: ValueDraft = { value: "", colorHex: "#3366ff" };
 
 export default function AttributesPage() {
+  const { can } = usePermissions();
   const [attributes, setAttributes] = useState<Attribute[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newAttributeName, setNewAttributeName] = useState("");
@@ -134,24 +136,26 @@ export default function AttributesPage() {
 
       {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
 
-      <div className="mt-6 flex max-w-lg flex-wrap gap-2">
-        <Input
-          placeholder="New attribute name, e.g. Color"
-          value={newAttributeName}
-          onChange={(e) => setNewAttributeName(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addAttribute()}
-          className="flex-1"
-        />
-        <select
-          value={newAttributeType}
-          onChange={(e) => setNewAttributeType(e.target.value as "TEXT" | "COLOR")}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-        >
-          <option value="TEXT">Text</option>
-          <option value="COLOR">Color swatch</option>
-        </select>
-        <Button variant="admin" onClick={addAttribute}>Add attribute</Button>
-      </div>
+      {can("attributes.create") && (
+        <div className="mt-6 flex max-w-lg flex-wrap gap-2">
+          <Input
+            placeholder="New attribute name, e.g. Color"
+            value={newAttributeName}
+            onChange={(e) => setNewAttributeName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && addAttribute()}
+            className="flex-1"
+          />
+          <select
+            value={newAttributeType}
+            onChange={(e) => setNewAttributeType(e.target.value as "TEXT" | "COLOR")}
+            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
+          >
+            <option value="TEXT">Text</option>
+            <option value="COLOR">Color swatch</option>
+          </select>
+          <Button variant="admin" onClick={addAttribute}>Add attribute</Button>
+        </div>
+      )}
 
       {isLoading ? (
         <p className="mt-8 text-sm text-gray-500">Loading...</p>
@@ -168,15 +172,17 @@ export default function AttributesPage() {
                     </span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setDeleteAttrTarget(attr.id)}
-                  title="Delete attribute"
-                  aria-label="Delete attribute"
-                  className="flex h-7 w-7 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                {can("attributes.delete") && (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteAttrTarget(attr.id)}
+                    title="Delete attribute"
+                    aria-label="Delete attribute"
+                    className="flex h-7 w-7 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
 
               <div className="mt-3 flex flex-wrap gap-2">
@@ -192,40 +198,44 @@ export default function AttributesPage() {
                       />
                     )}
                     {v.value}
-                    <button
-                      type="button"
-                      onClick={() => setDeleteValueTarget({ attributeId: attr.id, valueId: v.id })}
-                      aria-label={`Remove ${v.value}`}
-                      className="flex h-4 w-4 items-center justify-center text-slate-500 hover:text-red-600"
-                    >
-                      <X className="h-3 w-3" />
-                    </button>
+                    {can("attributes.edit") && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteValueTarget({ attributeId: attr.id, valueId: v.id })}
+                        aria-label={`Remove ${v.value}`}
+                        className="flex h-4 w-4 items-center justify-center text-slate-500 hover:text-red-600"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
                   </span>
                 ))}
                 {attr.values.length === 0 && <span className="text-xs text-gray-400">No values yet</span>}
               </div>
 
-              <div className="mt-3 flex gap-2">
-                {attr.type === "COLOR" && (
+              {can("attributes.edit") && (
+                <div className="mt-3 flex gap-2">
+                  {attr.type === "COLOR" && (
+                    <input
+                      type="color"
+                      value={draftFor(attr.id).colorHex}
+                      onChange={(e) => updateDraft(attr.id, { colorHex: e.target.value })}
+                      className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white p-1"
+                      title="Pick color"
+                    />
+                  )}
                   <input
-                    type="color"
-                    value={draftFor(attr.id).colorHex}
-                    onChange={(e) => updateDraft(attr.id, { colorHex: e.target.value })}
-                    className="h-9 w-10 shrink-0 cursor-pointer rounded-lg border border-gray-200 bg-white p-1"
-                    title="Pick color"
+                    value={draftFor(attr.id).value}
+                    onChange={(e) => updateDraft(attr.id, { value: e.target.value })}
+                    onKeyDown={(e) => e.key === "Enter" && addValue(attr)}
+                    placeholder={attr.type === "COLOR" ? "Color name, e.g. Red" : "Add value..."}
+                    className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
                   />
-                )}
-                <input
-                  value={draftFor(attr.id).value}
-                  onChange={(e) => updateDraft(attr.id, { value: e.target.value })}
-                  onKeyDown={(e) => e.key === "Enter" && addValue(attr)}
-                  placeholder={attr.type === "COLOR" ? "Color name, e.g. Red" : "Add value..."}
-                  className="flex-1 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                />
-                <Button size="sm" variant="adminOutline" onClick={() => addValue(attr)}>
-                  Add
-                </Button>
-              </div>
+                  <Button size="sm" variant="adminOutline" onClick={() => addValue(attr)}>
+                    Add
+                  </Button>
+                </div>
+              )}
             </div>
           ))}
         </div>

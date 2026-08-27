@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { resolveOrCreateWard } from "@/lib/ward";
 import { z } from "zod";
@@ -7,7 +7,7 @@ import { z } from "zod";
 /** Lists the admin-configured ward-to-ward proximity table used to rank alternative dealers. */
 export async function GET() {
   try {
-    await requireAdmin();
+    await requirePermission("dealers.view");
     const distances = await prisma.wardDistance.findMany({
       include: {
         fromWard: { include: { municipality: { select: { id: true, name: true } } } },
@@ -32,7 +32,7 @@ const createSchema = z.object({
 /** Sets the proximity between two wards. Symmetric: dealer ranking checks the pair in either direction. */
 export async function POST(request: Request) {
   try {
-    await requireAdmin();
+    await requirePermission("dealers.edit");
     const body = await request.json();
     const parsed = createSchema.safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");

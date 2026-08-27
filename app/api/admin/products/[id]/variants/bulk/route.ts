@@ -1,11 +1,14 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { variantBulkUpdateSchema, variantBulkActionSchema } from "@/schemas/admin-variant";
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.edit");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot modify central products");
+    }
     const { id: rawProductId } = await params;
     const productId = Number(rawProductId);
     if (Number.isNaN(productId)) return fail(400, "Invalid product id");

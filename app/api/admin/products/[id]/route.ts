@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { requireAdmin } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { ensureUniqueSlug } from "@/lib/slug";
 import { productSchema } from "@/schemas/admin-product";
@@ -8,10 +8,19 @@ import { syncDistributorDiscounts, syncDistributorPv } from "@/lib/product-distr
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.view");
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid product id");
+
+    // A dealer-linked login may only view products actually assigned to its own dealer, and
+    // only while the product is currently PUBLISHED — matching the list's same rule.
+    if (!admin.isSuperAdmin && admin.dealerId != null) {
+      const assignment = await prisma.dealerInventory.findFirst({
+        where: { dealerId: admin.dealerId, productId: id, status: "ACTIVE", product: { status: "PUBLISHED" } },
+      });
+      if (!assignment) return fail(404, "Product not found");
+    }
 
     const product = await prisma.product.findUnique({
       where: { id },
@@ -51,7 +60,10 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
 
 export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.edit");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot edit central products");
+    }
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid product id");
@@ -142,7 +154,10 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
 
 export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireAdmin();
+    const admin = await requirePermission("products.delete");
+    if (admin.dealerId != null) {
+      return fail(403, "Dealers cannot delete central products");
+    }
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid product id");

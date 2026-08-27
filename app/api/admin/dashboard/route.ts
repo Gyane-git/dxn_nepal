@@ -10,7 +10,12 @@ function dateKey(date: Date) {
 
 export async function GET() {
   try {
-    await requireAdmin();
+    const admin = await requireAdmin();
+
+    // A dealer-linked login (see Dealer.userId) only ever sees stats for its own dealer — never
+    // storewide totals across every dealer. Super Admin (and any non-dealer-linked admin) is exempt.
+    const scopedDealerId = !admin.isSuperAdmin ? admin.dealerId : null;
+    const orderScope = scopedDealerId != null ? { dealerId: scopedDealerId } : {};
 
     const since = new Date();
     since.setDate(since.getDate() - (DAYS - 1));
@@ -18,20 +23,27 @@ export async function GET() {
 
     const [totalOrders, totalCustomers, totalProducts, revenueAgg, recentOrders, statusGroups, topItems] =
       await Promise.all([
-        prisma.order.count(),
-        prisma.user.count({ where: { role: "USER" } }),
-        prisma.product.count({ where: { status: "PUBLISHED", deletedAt: null } }),
+        prisma.order.count({ where: orderScope }),
+        scopedDealerId != null
+          ? prisma.order.groupBy({ by: ["userId"], where: orderScope }).then((rows) => rows.length)
+          : prisma.user.count({ where: { role: "USER" } }),
+        scopedDealerId != null
+          ? prisma.product.count({
+              where: { status: "PUBLISHED", deletedAt: null, dealerInventory: { some: { dealerId: scopedDealerId, status: "ACTIVE" } } },
+            })
+          : prisma.product.count({ where: { status: "PUBLISHED", deletedAt: null } }),
         prisma.order.aggregate({
-          where: { status: { not: "CANCELLED" } },
+          where: { ...orderScope, status: { not: "CANCELLED" } },
           _sum: { total: true },
         }),
         prisma.order.findMany({
-          where: { placedAt: { gte: since }, status: { not: "CANCELLED" } },
+          where: { ...orderScope, placedAt: { gte: since }, status: { not: "CANCELLED" } },
           select: { placedAt: true, total: true },
         }),
-        prisma.order.groupBy({ by: ["status"], _count: { _all: true } }),
+        prisma.order.groupBy({ by: ["status"], where: orderScope, _count: { _all: true } }),
         prisma.orderItem.groupBy({
           by: ["name"],
+          where: scopedDealerId != null ? { order: { dealerId: scopedDealerId } } : {},
           _sum: { quantity: true },
           orderBy: { _sum: { quantity: "desc" } },
           take: 5,

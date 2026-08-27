@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/admin/ConfirmDialog";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface TrashedBrand {
   id: string;
@@ -12,6 +13,7 @@ interface TrashedBrand {
 }
 
 export default function BrandTrashPage() {
+  const { can } = usePermissions();
   const [brands, setBrands] = useState<TrashedBrand[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [permanentTarget, setPermanentTarget] = useState<string | null>(null);
@@ -78,12 +80,16 @@ export default function BrandTrashPage() {
                   <p className="truncate text-xs text-gray-400">/{b.slug}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button size="sm" variant="adminOutline" disabled={isBusy} onClick={() => restore(b.id)}>
-                    Restore
-                  </Button>
-                  <Button size="sm" variant="danger" disabled={isBusy} onClick={() => setPermanentTarget(b.id)}>
-                    Delete permanently
-                  </Button>
+                  {can("brands.edit") && (
+                    <Button size="sm" variant="adminOutline" disabled={isBusy} onClick={() => restore(b.id)}>
+                      Restore
+                    </Button>
+                  )}
+                  {can("brands.delete") && (
+                    <Button size="sm" variant="danger" disabled={isBusy} onClick={() => setPermanentTarget(b.id)}>
+                      Delete permanently
+                    </Button>
+                  )}
                 </div>
               </li>
             ))}

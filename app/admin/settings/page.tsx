@@ -26,6 +26,12 @@ const CARDS = [
     icon: <path d="M3 7l1-3h11l1 3M3 7h13M3 7v9a1 1 0 001 1h1m11-10v10a1 1 0 01-1 1H8m8-11h3l2 4v6a1 1 0 01-1 1h-1m-9 0a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" />,
   },
   {
+    href: "/admin/settings/roles",
+    title: "Roles & Permissions",
+    description: "Create custom roles and control exactly which modules and actions each one can access.",
+    icon: <path d="M12 3l8 4v5c0 5-3.4 8.4-8 9-4.6-.6-8-4-8-9V7l8-4zM9.5 12l2 2 4-4" />,
+  },
+  {
     href: "/admin/profile",
     title: "Profile",
     description: "Update your admin name/email and change your password.",

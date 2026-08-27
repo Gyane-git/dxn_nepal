@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/admin/SearchInput";
 import { Pagination } from "@/components/admin/Pagination";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface DealerRow {
   id: number;
@@ -20,6 +21,7 @@ interface DealerRow {
 const PAGE_SIZE = 20;
 
 export default function AdminDealersPage() {
+  const { dealerId: ownDealerId } = usePermissions();
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
@@ -57,9 +59,11 @@ export default function AdminDealersPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dealers</h1>
           <p className="mt-1 text-sm text-gray-500">Fulfillment points serving one or more cities.</p>
         </div>
-        <Link href="/admin/dealers/new">
-          <Button variant="admin" size="sm">New Dealer</Button>
-        </Link>
+        {ownDealerId == null && (
+          <Link href="/admin/dealers/new">
+            <Button variant="admin" size="sm">New Dealer</Button>
+          </Link>
+        )}
       </div>
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
