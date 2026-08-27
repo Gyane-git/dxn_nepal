@@ -95,3 +95,8 @@ body {
 .animate-fade-in {
   animation: fade-in 0.25s ease-out;
 }
+
+/* Temporarily hide Next.js development indicator */
+[data-next-badge-root] {
+  display: none !important;
+}

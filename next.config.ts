@@ -5,6 +5,9 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/*": ["./node_modules/.prisma/client/**/*", "./node_modules/@prisma/client/**/*"],
   },
+
+  // Hide Next.js development indicator
+  // devIndicators: false,
 };
 
 export default nextConfig;
