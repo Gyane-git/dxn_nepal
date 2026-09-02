@@ -27,14 +27,21 @@ export function SlugField({ value, onChange, sourceValue, prefix, label = "Slug"
   return (
     <div className="flex flex-col gap-1.5">
       <Input
+        className="cursor-not-allowed"
         label={label}
+        disabled
         value={value}
         onChange={(e) => {
           setTouched(true);
           onChange(slugify(e.target.value));
         }}
       />
-      {prefix && value && <p className="text-xs text-gray-400">{prefix}{value}</p>}
+      {prefix && value && (
+        <p className="text-xs text-gray-400">
+          {prefix}
+          {value}
+        </p>
+      )}
     </div>
   );
 }

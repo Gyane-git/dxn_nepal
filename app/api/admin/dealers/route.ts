@@ -40,12 +40,7 @@ export async function GET(request: Request) {
       ...(status ? { status: status as "ACTIVE" | "INACTIVE" } : {}),
       ...(search
         ? {
-            OR: [
-              { name: { contains: search } },
-              { phone: { contains: search } },
-              { user: { email: { contains: search } } },
-              { user: { distributorId: { contains: search } } },
-            ],
+            OR: [{ name: { contains: search } }, { phone: { contains: search } }, { user: { email: { contains: search } } }, { user: { distributorId: { contains: search } } }],
           }
         : {}),
     };

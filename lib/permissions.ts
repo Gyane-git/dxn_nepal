@@ -163,13 +163,11 @@ export const PERMISSIONS: PermissionDef[] = MODULES.flatMap((m) =>
   })),
 );
 
-export const PERMISSION_MODULES: { module: string; label: string; permissions: PermissionDef[] }[] = MODULES.map(
-  (m) => ({
-    module: m.module,
-    label: m.moduleLabel,
-    permissions: m.actions.map((a) => ({ key: `${m.module}.${a.action}`, module: m.module, action: a.action, label: a.label })),
-  }),
-);
+export const PERMISSION_MODULES: { module: string; label: string; permissions: PermissionDef[] }[] = MODULES.map((m) => ({
+  module: m.module,
+  label: m.moduleLabel,
+  permissions: m.actions.map((a) => ({ key: `${m.module}.${a.action}`, module: m.module, action: a.action, label: a.label })),
+}));
 
 export const ALL_PERMISSION_KEYS: string[] = PERMISSIONS.map((p) => p.key);
 
@@ -179,11 +177,4 @@ export const ALL_PERMISSION_KEYS: string[] = PERMISSIONS.map((p) => p.key);
  * whose Dealer.adminRoleId is null — deliberately a subset of ALL_PERMISSION_KEYS, since an
  * unrestricted dealer should never be shown admin-only keys like `roles.delete`.
  */
-export const DEALER_PORTAL_PERMISSION_KEYS: string[] = [
-  "dashboard.view",
-  "products.view",
-  "dealer_inventory.view",
-  "dealer_inventory.update",
-  "orders.view",
-  "orders.edit",
-];
+export const DEALER_PORTAL_PERMISSION_KEYS: string[] = ["dashboard.view", "products.view", "dealer_inventory.view", "dealer_inventory.update", "orders.view", "orders.edit"];

@@ -33,36 +33,23 @@ export function GeneralTab({ values, set }: TabProps) {
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-soft lg:col-span-2">
         <Input label="Product name" value={values.name} onChange={(e) => set("name", e.target.value)} required />
+        {/* Slug */}
         <SlugField value={values.slug} onChange={(slug) => set("slug", slug)} sourceValue={values.name} prefix="/product/" />
+        {/* SKU */}
         <Input label="SKU (leave blank to auto-generate)" value={values.sku} onChange={(e) => set("sku", e.target.value)} />
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Short description</label>
-          <textarea
-            value={values.shortDescription}
-            onChange={(e) => set("shortDescription", e.target.value)}
-            rows={3}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-          />
+          <textarea value={values.shortDescription} onChange={(e) => set("shortDescription", e.target.value)} rows={3} className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
         </div>
 
-        <RichTextEditor
-          label="Full description"
-          value={values.fullDescription}
-          onChange={(html) => set("fullDescription", html)}
-          placeholder="Full product description..."
-        />
+        <RichTextEditor label="Full description" value={values.fullDescription} onChange={(html) => set("fullDescription", html)} placeholder="Full product description..." />
       </div>
 
       <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-soft">
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Category</label>
-          <select
-            value={values.categoryId}
-            onChange={(e) => set("categoryId", e.target.value)}
-            required
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-          >
+          <select value={values.categoryId} onChange={(e) => set("categoryId", e.target.value)} required className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100">
             <option value="">Select category</option>
             {categories.map((c) => (
               <option key={c.id} value={c.id}>
@@ -74,11 +61,7 @@ export function GeneralTab({ values, set }: TabProps) {
 
         <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Brand</label>
-          <select
-            value={values.brandId ?? ""}
-            onChange={(e) => set("brandId", e.target.value || null)}
-            className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-          >
+          <select value={values.brandId ?? ""} onChange={(e) => set("brandId", e.target.value || null)} className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100">
             <option value="">No brand</option>
             {brands.map((b) => (
               <option key={b.id} value={b.id}>

@@ -10,15 +10,11 @@ export function Footer() {
       <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 grid-cols-2 sm:px-6 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
         <div>
           <Logo />
-          <p className="mt-3 text-sm text-gray-500">
-            Quality products crafted for a healthier everyday life.
-          </p>
+          <p className="mt-3 text-sm text-gray-500">Quality products crafted for a healthier everyday life.</p>
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Shop
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Shop</h4>
           <ul className="mt-3 space-y-2 text-sm text-gray-500">
             <li>
               <Link href="/shop" className="hover:text-primary-600">
@@ -34,9 +30,7 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Account
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Account</h4>
           <ul className="mt-3 space-y-2 text-sm text-gray-500">
             <li>
               <Link href="/account/orders" className="hover:text-primary-600">
@@ -57,27 +51,18 @@ export function Footer() {
         </div>
 
         <div>
-          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">
-            Support
-          </h4>
+          <h4 className="text-sm font-semibold uppercase tracking-wide text-gray-900">Support</h4>
           <p className="mt-3 text-sm text-gray-500">info@dxn.com</p>
-          <p className="text-sm text-gray-500">General Line: +603-60339800</p>
-          <p className="text-sm text-gray-500">Sales Counter: +603-60339834</p>
+          <p className="text-sm text-gray-500">General Line: +977 1-5429118</p>
+          <p className="text-sm text-gray-500">Sales Counter: +977 1-5429118</p>
         </div>
       </div>
       <div className="relative border-t border-gray-100 px-4 py-4 text-center text-xs text-gray-400">
         <p>&copy; {new Date().getFullYear()} DXN. All rights reserved.</p>
 
-        <p className="mt-1">
-          Cash on Delivery &amp; secure online checkout available.
-        </p>
+        <p className="mt-1">Cash on Delivery &amp; secure online checkout available.</p>
 
-        <button
-          type="button"
-          onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-          aria-label="Back to top"
-          className="absolute right-35 top-1/2 -translate-y-1/2 cursor-pointer transition-colors hover:text-primary-600"
-        >
+        <button type="button" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })} aria-label="Back to top" className="absolute right-35 top-1/2 -translate-y-1/2 cursor-pointer transition-colors hover:text-primary-600">
           <ArrowUp className="h-6 w-6" strokeWidth={2} />
         </button>
       </div>

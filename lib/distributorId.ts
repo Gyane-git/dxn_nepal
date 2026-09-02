@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 
-const DISTRIBUTOR_ID_PATTERN = /^DXN-\d+$/i;
+// const DISTRIBUTOR_ID_PATTERN = /^DXN-\d+$/i;
+const DISTRIBUTOR_ID_PATTERN = /^\d{8}$/;
 
 /** True when `value` looks like a Distributor ID (e.g. "DXN-100001") rather than an email/other identifier. */
 export function isDistributorId(value: string): boolean {
@@ -16,8 +17,9 @@ export function isDistributorId(value: string): boolean {
 export async function generateDistributorId(tx: Prisma.TransactionClient): Promise<string> {
   const sequence = await tx.distributorSequence.upsert({
     where: { id: "singleton" },
-    create: { id: "singleton", lastValue: 100001 },
+    create: { id: "singleton", lastValue: 100000001 },
     update: { lastValue: { increment: 1 } },
   });
-  return `DXN-${sequence.lastValue}`;
+  // return `DXN-${sequence.lastValue}`;
+  return String(sequence.lastValue);
 }

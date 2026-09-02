@@ -112,18 +112,34 @@ export default function AdminDistributorApplicationPage() {
   }
 
   if (notFound) return <p className="text-sm text-gray-500">Application not found.</p>;
-  if (!application) return <p className="text-sm text-gray-500">Loading...</p>;
+  // if (!application) return <p className="text-sm text-gray-500">Loading...</p>;
+  if (!application) {
+    return (
+      <div className="flex min-h-[300px] items-center justify-center">
+        <div className="w-full max-w-md rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="flex items-center gap-4">
+            {/* Spinner */}
+            <div className="h-10 w-10 animate-spin rounded-full border-4 border-gray-200 border-t-blue-600" />
 
-  const addressLine = [
-    application.fullAddress,
-    application.toleArea,
-    application.ward ? `Ward ${application.ward.wardNo}` : null,
-    application.municipality?.name,
-    application.district?.name,
-    application.province?.name,
-  ]
-    .filter(Boolean)
-    .join(", ");
+            <div className="flex-1 space-y-2">
+              <div className="h-4 w-32 animate-pulse rounded bg-gray-200" />
+              <div className="h-3 w-48 animate-pulse rounded bg-gray-100" />
+            </div>
+          </div>
+
+          <div className="mt-6 space-y-3">
+            <div className="h-3 w-full animate-pulse rounded bg-gray-100" />
+            <div className="h-3 w-5/6 animate-pulse rounded bg-gray-100" />
+            <div className="h-3 w-4/6 animate-pulse rounded bg-gray-100" />
+          </div>
+
+          <p className="mt-5 text-center text-sm text-gray-500">Loading application...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const addressLine = [application.fullAddress, application.toleArea, application.ward ? `Ward ${application.ward.wardNo}` : null, application.municipality?.name, application.district?.name, application.province?.name].filter(Boolean).join(", ");
 
   return (
     <div className="max-w-3xl">
@@ -154,12 +170,7 @@ export default function AdminDistributorApplicationPage() {
           <Field label="Submitted" value={new Date(application.createdAt).toLocaleString()} />
           <Field label="Address" value={addressLine || null} />
           <Field label="Landmark" value={application.landmark} />
-          {application.sponsor && (
-            <Field
-              label="Sponsor"
-              value={`${application.sponsor.name} (${application.sponsor.distributorId ?? "—"})`}
-            />
-          )}
+          {application.sponsor && <Field label="Sponsor" value={`${application.sponsor.name} (${application.sponsor.distributorId ?? "—"})`} />}
         </dl>
 
         {(application.businessName || application.panVatNumber || application.businessType) && (
@@ -174,10 +185,7 @@ export default function AdminDistributorApplicationPage() {
               <Field label="Business email" value={application.businessEmail} />
               <Field label="Years in business" value={application.yearsInBusiness} />
               <Field label="Number of employees" value={application.numberOfEmployees} />
-              <Field
-                label="Estimated monthly sales"
-                value={application.estimatedMonthlySales ? `Rs ${Number(application.estimatedMonthlySales).toLocaleString()}` : null}
-              />
+              <Field label="Estimated monthly sales" value={application.estimatedMonthlySales ? `Rs ${Number(application.estimatedMonthlySales).toLocaleString()}` : null} />
               <Field label="Business address" value={application.businessAddress} />
             </dl>
           </>
@@ -217,13 +225,7 @@ export default function AdminDistributorApplicationPage() {
           <div className="mt-6 flex flex-col gap-3 border-t border-gray-100 pt-5">
             {showRejectForm ? (
               <div className="flex flex-col gap-2">
-                <textarea
-                  value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
-                  placeholder="Reason for rejection (required)"
-                  rows={3}
-                  className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100"
-                />
+                <textarea value={rejectionReason} onChange={(e) => setRejectionReason(e.target.value)} placeholder="Reason for rejection (required)" rows={3} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100" />
                 <div className="flex gap-2">
                   <Button variant="adminOutline" onClick={() => setShowRejectForm(false)} disabled={isBusy}>
                     Cancel

@@ -138,17 +138,7 @@ export const EMPTY_PRODUCT: ProductFormValues = {
   pvDistributorIds: [],
 };
 
-const TABS = [
-  "General",
-  "Pricing",
-  "Distributor Pricing",
-  "Inventory",
-  "Shipping",
-  "Media",
-  "Flags & SEO",
-  "Variants",
-  "Related",
-] as const;
+const TABS = ["General", "Pricing", "Distributor Pricing", "Inventory", "Shipping", "Media", "Flags & SEO", "Variants", "Related"] as const;
 type Tab = (typeof TABS)[number];
 
 function toPayload(values: ProductFormValues) {
@@ -218,9 +208,7 @@ export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps
             onClick={() => setTab(t)}
             disabled={t === "Variants" && !values.id}
             title={t === "Variants" && !values.id ? "Save the product first to manage variants" : undefined}
-            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
-              tab === t ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"
-            }`}
+            className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${tab === t ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"}`}
           >
             {t}
           </button>
