@@ -59,7 +59,7 @@ export function GeneralTab({ values, set }: TabProps) {
           </select>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        {/* <div className="flex flex-col gap-1.5">
           <label className="text-sm font-medium text-gray-700">Brand</label>
           <select value={values.brandId ?? ""} onChange={(e) => set("brandId", e.target.value || null)} className="rounded-lg border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100">
             <option value="">No brand</option>
@@ -69,7 +69,7 @@ export function GeneralTab({ values, set }: TabProps) {
               </option>
             ))}
           </select>
-        </div>
+        </div> */}
       </div>
     </div>
   );

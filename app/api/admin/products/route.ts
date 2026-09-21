@@ -3,11 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
-import { ensureUniqueSlug } from "@/lib/slug";
-import { generateSku } from "@/lib/sku";
-import { syncRelations } from "@/lib/product-relations";
-import { syncDistributorDiscounts, syncDistributorPv } from "@/lib/product-distributor-rules";
-import { productSchema } from "@/schemas/admin-product";
 
 export async function GET(request: Request) {
   try {
@@ -79,81 +74,10 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const admin = await requirePermission("products.create");
-    if (admin.dealerId != null) {
-      return fail(403, "Dealers cannot create central products");
-    }
-    const body = await request.json();
-    const parsed = productSchema.safeParse(body);
-    if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
-
-    const data = parsed.data;
-    const slug = await ensureUniqueSlug(prisma.product, data.slug || data.name);
-    const sku = data.sku?.trim() || generateSku(data.name);
-
-    const product = await prisma.$transaction(async (tx) => {
-      const created = await tx.product.create({
-        data: {
-          name: data.name,
-          slug,
-          sku,
-          categoryId: data.categoryId,
-          brandId: data.brandId || null,
-          shortDescription: data.shortDescription || null,
-          fullDescription: data.fullDescription,
-          costPrice: data.costPrice ?? null,
-          price: data.price,
-          compareAtPrice: data.compareAtPrice ?? null,
-          discountType: data.discountType ?? null,
-          discountValue: data.discountValue ?? null,
-          taxClass: data.taxClass || null,
-          stock: data.stock,
-          lowStockAlert: data.lowStockAlert ?? null,
-          stockStatus: data.stockStatus,
-          minimumOrderQuantity: data.minimumOrderQuantity,
-          maximumOrderQuantity: data.maximumOrderQuantity ?? null,
-          weight: data.weight ?? null,
-          length: data.length ?? null,
-          width: data.width ?? null,
-          height: data.height ?? null,
-          featuredImage: data.featuredImage || null,
-          isFeatured: data.isFeatured,
-          isBestSeller: data.isBestSeller,
-          isNewArrival: data.isNewArrival,
-          isOnSale: data.isOnSale,
-          isTrending: data.isTrending,
-          isSpecial: data.isSpecial,
-          isWeekly: data.isWeekly,
-          isFlash: data.isFlash,
-          metaTitle: data.metaTitle || null,
-          metaDescription: data.metaDescription || null,
-          metaKeywords: data.metaKeywords || null,
-          warranty: data.warranty || null,
-          tags: data.tags,
-          colorway: data.colorway,
-          status: data.status,
-          publishedAt: data.status === "PUBLISHED" ? new Date() : null,
-          hasDiscount: data.hasDiscount,
-          forCustomer: data.hasDiscount && data.forCustomer,
-          customerDiscountPercent: data.hasDiscount && data.forCustomer ? data.customerDiscountPercent : null,
-          forDistributor: data.hasDiscount && data.forDistributor,
-          hasPointValue: data.hasPointValue,
-          images: {
-            create: data.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: img.sortOrder ?? i })),
-          },
-        },
-      });
-
-      const distributorDiscounts = data.hasDiscount && data.forDistributor ? data.distributorDiscounts : [];
-      await syncRelations(tx, created.id, data.relatedIds, data.crossSellIds, data.upSellIds);
-      await syncDistributorDiscounts(tx, created.id, distributorDiscounts);
-      await syncDistributorPv(tx, created.id, data.hasPointValue ? data.pvDistributorIds : [], data.price, distributorDiscounts);
-      return created;
-    });
-
-    return ok(product, "Product created");
+    await requirePermission("products.create");
+    return fail(403, "Products are managed by OMS. Use Sync OMS Catalog from the product list.");
   } catch (error) {
     return handleApiError(error);
   }

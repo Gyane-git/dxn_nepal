@@ -3,8 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
-import { ensureUniqueSlug } from "@/lib/slug";
-import { categorySchema } from "@/schemas/admin-category";
 
 export async function GET(request: Request) {
   try {
@@ -59,35 +57,10 @@ export async function GET(request: Request) {
   }
 }
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     await requirePermission("categories.create");
-    const body = await request.json();
-    const parsed = categorySchema.safeParse(body);
-    if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
-
-    const data = parsed.data;
-    const slug = await ensureUniqueSlug(prisma.category, data.slug || data.name);
-
-    const category = await prisma.category.create({
-      data: {
-        name: data.name,
-        slug,
-        parentCategoryId: data.parentCategoryId || null,
-        description: data.description || null,
-        image: data.image || null,
-        bannerImage: data.bannerImage || null,
-        icon: data.icon || null,
-        metaTitle: data.metaTitle || null,
-        metaDescription: data.metaDescription || null,
-        metaKeywords: data.metaKeywords || null,
-        sortOrder: data.sortOrder,
-        isFeatured: data.isFeatured,
-        status: data.status,
-      },
-    });
-
-    return ok(category, "Category created");
+    return fail(403, "Categories are managed by OMS and are created during catalog sync.");
   } catch (error) {
     return handleApiError(error);
   }

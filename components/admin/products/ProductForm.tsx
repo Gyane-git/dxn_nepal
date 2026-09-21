@@ -172,9 +172,10 @@ interface ProductFormProps {
   initial: ProductFormValues;
   onSubmit: (payload: ReturnType<typeof toPayload>) => Promise<{ ok: boolean; message?: string }>;
   submitLabel: string;
+  mediaOnly?: boolean;
 }
 
-export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps) {
+export function ProductForm({ initial, onSubmit, submitLabel, mediaOnly = false }: ProductFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<ProductFormValues>(initial);
   const [tab, setTab] = useState<Tab>("General");
@@ -189,7 +190,7 @@ export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps
     e.preventDefault();
     setError(null);
     setIsSubmitting(true);
-    const result = await onSubmit(toPayload(values));
+    const result = await onSubmit(mediaOnly ? { featuredImage: values.featuredImage, images: values.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: i })) } as ReturnType<typeof toPayload> : toPayload(values));
     setIsSubmitting(false);
     if (!result.ok) {
       setError(result.message ?? "Something went wrong");
@@ -201,7 +202,7 @@ export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-6">
       <div className="flex flex-nowrap gap-1 overflow-x-auto rounded-xl border border-gray-200 bg-white p-1.5 shadow-soft">
-        {TABS.map((t) => (
+        {(mediaOnly ? (["Media"] as Tab[]) : TABS).map((t) => (
           <button
             key={t}
             type="button"
@@ -215,6 +216,7 @@ export function ProductForm({ initial, onSubmit, submitLabel }: ProductFormProps
         ))}
       </div>
 
+      {mediaOnly && <p className="rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-800">Product details, pricing, stock, and category are synced from OMS. Only product images can be updated here.</p>}
       {tab === "General" && <GeneralTab values={values} set={set} />}
       {tab === "Pricing" && <PricingTab values={values} set={set} />}
       {tab === "Distributor Pricing" && <DistributorPricingTab values={values} set={set} />}

@@ -1,30 +1,10 @@
-import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
-import { ok, fail, handleApiError } from "@/lib/api";
-import { categoryReorderSchema } from "@/schemas/admin-category";
+import { fail, handleApiError } from "@/lib/api";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     await requirePermission("categories.edit");
-    const body = await request.json();
-    const parsed = categoryReorderSchema.safeParse(body);
-    if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
-
-    const { items } = parsed.data;
-
-    await prisma.$transaction(
-      items.map((item) =>
-        prisma.category.update({
-          where: { id: item.id },
-          data: {
-            sortOrder: item.sortOrder,
-            ...(item.parentCategoryId !== undefined ? { parentCategoryId: item.parentCategoryId || null } : {}),
-          },
-        })
-      )
-    );
-
-    return ok(null, "Order updated");
+    return fail(403, "Categories are managed by OMS.");
   } catch (error) {
     return handleApiError(error);
   }

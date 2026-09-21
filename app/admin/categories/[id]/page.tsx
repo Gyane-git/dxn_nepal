@@ -55,9 +55,9 @@ export default function EditCategoryPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="text-2xl font-bold tracking-tight text-gray-900">Edit Category</h1>
-      <p className="mt-1 text-sm text-gray-500">Update this category&apos;s details.</p>
+      <p className="mt-1 text-sm text-gray-500">OMS controls category details. You can update category images here.</p>
       <div className="mt-6">
-        {initial && <CategoryForm initial={initial} onSubmit={handleSubmit} submitLabel="Save changes" />}
+        {initial && <CategoryForm initial={initial} onSubmit={handleSubmit} submitLabel="Save images" mediaOnly />}
       </div>
     </div>
   );

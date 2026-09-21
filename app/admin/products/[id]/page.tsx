@@ -102,8 +102,8 @@ export default function EditProductPage() {
   return (
     <div>
       <h1 className="text-2xl font-bold tracking-tight text-gray-900">Edit Product</h1>
-      <p className="mt-1 text-sm text-gray-500">Update this product&apos;s details.</p>
-      <div className="mt-6">{initial && <ProductForm initial={initial} onSubmit={handleSubmit} submitLabel="Save changes" />}</div>
+      <p className="mt-1 text-sm text-gray-500">OMS controls product details. You can update product images here.</p>
+      <div className="mt-6">{initial && <ProductForm initial={initial} onSubmit={handleSubmit} submitLabel="Save images" mediaOnly />}</div>
     </div>
   );
 }

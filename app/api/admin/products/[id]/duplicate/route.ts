@@ -1,15 +1,11 @@
-import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
-import { ok, fail, handleApiError } from "@/lib/api";
-import { ensureUniqueSlug } from "@/lib/slug";
-import { generateSku } from "@/lib/sku";
+import { fail, handleApiError } from "@/lib/api";
 
-export async function POST(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST() {
   try {
-    const admin = await requirePermission("products.create");
-    if (admin.dealerId != null) {
-      return fail(403, "Dealers cannot create central products");
-    }
+    await requirePermission("products.create");
+    return fail(403, "Products are managed by OMS and cannot be duplicated here.");
+    /*
     const { id: rawId } = await params;
     const id = Number(rawId);
     if (Number.isNaN(id)) return fail(400, "Invalid product id");
@@ -95,7 +91,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ id
       return created;
     });
 
-    return ok(duplicate, "Product duplicated");
+    return ok(duplicate, "Product duplicated"); */
   } catch (error) {
     return handleApiError(error);
   }

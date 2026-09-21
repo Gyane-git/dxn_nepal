@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Pencil, Copy, Trash2 } from "lucide-react";
+import { Pencil, Copy, Trash2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
 import { StatusBadge } from "@/components/ui/Badge";
 import { SearchInput } from "@/components/admin/SearchInput";
@@ -51,6 +51,7 @@ export default function ProductsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBusy, setIsBusy] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/categories?tree=true").then((res) => res.json()).then((json) => setCategories(json.data?.categories ?? []));
@@ -119,6 +120,21 @@ export default function ProductsPage() {
     load();
   }
 
+  async function syncOms() {
+    setIsBusy(true);
+    setSyncMessage(null);
+    const res = await fetch("/api/admin/oms/sync", { method: "POST" });
+    const json = await res.json();
+    setIsBusy(false);
+    if (!res.ok) {
+      setSyncMessage(json.message ?? "OMS sync failed.");
+      return;
+    }
+    const data = json.data;
+    setSyncMessage(`OMS synced: ${data.createdProducts} added, ${data.updatedProducts} updated, ${data.createdCategories + data.updatedCategories} categories processed.`);
+    load();
+  }
+
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const selectClass =
     "rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-slate-400 focus:ring-2 focus:ring-slate-100";
@@ -128,19 +144,17 @@ export default function ProductsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Products</h1>
-          <p className="mt-1 text-sm text-gray-500">Manage your product catalog.</p>
+          <p className="mt-1 text-sm text-gray-500">Products, prices, stock, and categories are managed by OMS. Images can be updated locally.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/admin/products/trash">
+          {false && <Link href="/admin/products/trash">
             <Button variant="adminOutline" size="sm">Trash</Button>
-          </Link>
-          {can("products.create") && (
-            <Link href="/admin/products/new">
-              <Button variant="admin" size="sm">New Product</Button>
-            </Link>
-          )}
+          </Link>}
+          {can("products.edit") && <Button variant="admin" size="sm" onClick={syncOms} isLoading={isBusy}><RefreshCw size={15} /> Sync OMS Catalog</Button>}
         </div>
       </div>
+
+      {syncMessage && <p className="mt-4 text-sm text-gray-600">{syncMessage}</p>}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search by name or SKU..." className="w-full sm:w-64" />
@@ -148,29 +162,29 @@ export default function ProductsPage() {
           <option value="">All categories</option>
           {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        <select value={brandId} onChange={(e) => { setBrandId(e.target.value); setPage(1); }} className={selectClass}>
+        {/* <select value={brandId} onChange={(e) => { setBrandId(e.target.value); setPage(1); }} className={selectClass}>
           <option value="">All brands</option>
           {brands.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
-        <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
+        </select> */}
+        {/* <select value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }} className={selectClass}>
           <option value="">All statuses</option>
           <option value="DRAFT">Draft</option>
           <option value="PUBLISHED">Published</option>
           <option value="ARCHIVED">Archived</option>
-        </select>
-        <select value={stockStatus} onChange={(e) => { setStockStatus(e.target.value); setPage(1); }} className={selectClass}>
+        </select> */}
+        {/* <select value={stockStatus} onChange={(e) => { setStockStatus(e.target.value); setPage(1); }} className={selectClass}>
           <option value="">All stock</option>
           <option value="IN_STOCK">In stock</option>
           <option value="OUT_OF_STOCK">Out of stock</option>
           <option value="ON_BACKORDER">On backorder</option>
-        </select>
-        <select value={featured} onChange={(e) => { setFeatured(e.target.value); setPage(1); }} className={selectClass}>
+        </select> */}
+        {/* <select value={featured} onChange={(e) => { setFeatured(e.target.value); setPage(1); }} className={selectClass}>
           <option value="">Featured & non-featured</option>
           <option value="true">Featured only</option>
-        </select>
+        </select> */}
       </div>
 
-      <div className="mt-4">
+      {false && <div className="mt-4">
         <BulkActionBar
           selectedCount={selectedIds.size}
           isBusy={isBusy}
@@ -189,7 +203,7 @@ export default function ProductsPage() {
             ...(can("products.delete") ? [{ key: "delete", label: "Delete", variant: "danger" as const }] : []),
           ]}
         />
-      </div>
+      </div>}
 
       <div className="mt-4 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-soft">
         {isLoading ? (
@@ -200,101 +214,185 @@ export default function ProductsPage() {
           <>
             <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[760px] text-left text-sm">
-                <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
-                  <tr>
-                    <th className="w-10 px-4 py-3"></th>
-                    <th className="px-4 py-3">Product</th>
-                    <th className="px-4 py-3">SKU</th>
-                    <th className="px-4 py-3">Category</th>
-                    <th className="px-4 py-3">Price</th>
-                    <th className="px-4 py-3">Stock</th>
-                    <th className="px-4 py-3">Status</th>
-                    <th className="px-4 py-3"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {rows.map((p) => (
-                    <tr key={p.id}>
-                      <td className="px-4 py-3">
-                        <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 rounded border-gray-300" />
-                      </td>
-                      <td className="px-4 py-3">
-                        {can("products.edit") ? (
-                          <Link href={`/admin/products/${p.id}`} className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600">
-                            {p.images[0]?.url && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
-                            )}
-                            <span>
-                              {p.name}
-                              {p.isFeatured && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
-                              {p._count.variants > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{p._count.variants} variants</span>}
-                            </span>
-                          </Link>
-                        ) : (
-                          <span className="flex items-center gap-3 font-medium text-gray-900">
-                            {p.images[0]?.url && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={p.images[0].url} alt="" className="h-9 w-9 rounded-lg object-cover" />
-                            )}
-                            <span>
-                              {p.name}
-                              {p.isFeatured && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Featured</span>}
-                              {p._count.variants > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{p._count.variants} variants</span>}
-                            </span>
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-gray-500">{p.sku}</td>
-                      <td className="px-4 py-3 text-gray-500">{p.category?.name}</td>
-                      <td className="px-4 py-3 text-gray-700">Rs {p.price.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-gray-500">{p.stock}</td>
-                      <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-1">
-                          {can("products.edit") && (
-                            <Link
-                              href={`/admin/products/${p.id}`}
-                              title="Edit"
-                              aria-label="Edit"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Link>
-                          )}
-                          {can("products.create") && (
-                            <button
-                              type="button"
-                              onClick={() => handleDuplicate(p.id)}
-                              title="Duplicate"
-                              aria-label="Duplicate"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-slate-700"
-                            >
-                              <Copy className="h-4 w-4" />
-                            </button>
-                          )}
-                          {can("products.delete") && (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget(p.id)}
-                              title="Move to trash"
-                              aria-label="Move to trash"
-                              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
+                <thead>
+  <tr>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      Product
+    </th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      SKU
+    </th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      Category
+    </th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      Price
+    </th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      Stock
+    </th>
+    <th className="px-4 py-3 text-left font-semibold text-gray-700">
+      Status
+    </th>
+
+    <th className="px-4 py-3 text-right font-semibold text-gray-700">
+      Actions
+    </th>
+  </tr>
+</thead>
+
+<tbody className="divide-y divide-gray-100">
+  {rows.map((p) => (
+    <tr key={p.id}>
+
+      {/* Product */}
+      <td className="px-4 py-3">
+        {can("products.edit") ? (
+          <Link
+            href={`/admin/products/${p.id}`}
+            className="flex items-center gap-3 font-medium text-gray-900 hover:text-slate-600"
+          >
+            {p.images[0]?.url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.images[0].url}
+                alt={p.name}
+                className="h-9 w-9 rounded-lg object-cover"
+              />
+            )}
+
+            <span className="min-w-0">
+              <span className="block truncate">
+                {p.name}
+              </span>
+
+              <span className="mt-0.5 flex items-center gap-2">
+                {p.isFeatured && (
+                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                    Featured
+                  </span>
+                )}
+
+                {p._count.variants > 0 && (
+                  <span className="text-xs font-normal text-gray-400">
+                    {p._count.variants} variants
+                  </span>
+                )}
+              </span>
+            </span>
+          </Link>
+        ) : (
+          <div className="flex items-center gap-3 font-medium text-gray-900">
+            {p.images[0]?.url && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={p.images[0].url}
+                alt={p.name}
+                className="h-9 w-9 rounded-lg object-cover"
+              />
+            )}
+
+            <span className="min-w-0">
+              <span className="block truncate">
+                {p.name}
+              </span>
+
+              <span className="mt-0.5 flex items-center gap-2">
+                {p.isFeatured && (
+                  <span className="inline-flex rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                    Featured
+                  </span>
+                )}
+
+                {p._count.variants > 0 && (
+                  <span className="text-xs font-normal text-gray-400">
+                    {p._count.variants} variants
+                  </span>
+                )}
+              </span>
+            </span>
+          </div>
+        )}
+      </td>
+
+      {/* SKU */}
+      <td className="px-4 py-3 text-gray-500">
+        {p.sku || "-"}
+      </td>
+
+      {/* Category */}
+      <td className="px-4 py-3 text-gray-500">
+        {p.category?.name || "-"}
+      </td>
+
+      {/* Price */}
+      <td className="px-4 py-3 text-gray-700">
+        Rs {p.price?.toLocaleString() || "0"}
+      </td>
+
+      {/* Stock */}
+      <td className="px-4 py-3 text-gray-500">
+        {p.stock ?? 0}
+      </td>
+
+      {/* Status */}
+      <td className="px-4 py-3">
+        <StatusBadge status={p.status} />
+      </td>
+
+
+
+      {/* Actions */}
+      <td className="px-4 py-3 text-right">
+        <div className="flex items-center justify-end gap-1">
+          {can("products.edit") && (
+            <Link
+              href={`/admin/products/${p.id}`}
+              title="Edit"
+              aria-label="Edit"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-slate-700"
+            >
+              <Pencil className="h-4 w-4" />
+            </Link>
+          )}
+
+          {false && can("products.create") && (
+            <button
+              type="button"
+              onClick={() => handleDuplicate(p.id)}
+              title="Duplicate"
+              aria-label="Duplicate"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-500 transition hover:bg-gray-100 hover:text-slate-700"
+            >
+              <Copy className="h-4 w-4" />
+            </button>
+          )}
+
+          {false && can("products.delete") && (
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(p.id)}
+              title="Move to trash"
+              aria-label="Move to trash"
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 transition hover:bg-red-50 hover:text-red-700"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+      </td>
+
+
+    </tr>
+  ))}
+</tbody>
+
               </table>
             </div>
             <ul className="divide-y divide-gray-100 md:hidden">
               {rows.map((p) => (
                 <li key={p.id} className="flex items-center gap-3 px-4 py-3">
-                  <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 shrink-0 rounded border-gray-300" />
+                  {false && <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleSelect(p.id)} className="h-4 w-4 shrink-0 rounded border-gray-300" />}
                   {can("products.edit") ? (
                     <Link href={`/admin/products/${p.id}`} className="min-w-0 flex-1 truncate text-sm font-medium text-gray-900">{p.name}</Link>
                   ) : (
@@ -306,12 +404,12 @@ export default function ProductsPage() {
                       <Pencil className="h-4 w-4" />
                     </Link>
                   )}
-                  {can("products.create") && (
+                  {false && can("products.create") && (
                     <button type="button" onClick={() => handleDuplicate(p.id)} title="Duplicate" aria-label="Duplicate" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100">
                       <Copy className="h-4 w-4" />
                     </button>
                   )}
-                  {can("products.delete") && (
+                  {false && can("products.delete") && (
                     <button type="button" onClick={() => setDeleteTarget(p.id)} title="Move to trash" aria-label="Move to trash" className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-red-500 hover:bg-red-50">
                       <Trash2 className="h-4 w-4" />
                     </button>

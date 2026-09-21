@@ -296,7 +296,7 @@ export default async function HomePage() {
         hrefFor={(slug) => `/shop?category=${slug}`}
       />
 
-      <CategoryBrandGrid
+      {/* <CategoryBrandGrid
         title="Brands"
         items={brands.map((b) => ({
           id: b.id,
@@ -305,7 +305,7 @@ export default async function HomePage() {
           image: b.logo,
         }))}
         hrefFor={(slug) => `/shop?brand=${slug}`}
-      />
+      /> */}
 
       <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-3">

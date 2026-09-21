@@ -25,7 +25,6 @@ dist/
 # Environment Variables
 # =========================================================
 .env
-.env.example
 .env.production
 
 

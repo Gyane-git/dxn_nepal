@@ -1,10 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
-import { ensureUniqueSlug } from "@/lib/slug";
-import { productSchema } from "@/schemas/admin-product";
-import { syncRelations } from "@/lib/product-relations";
-import { syncDistributorDiscounts, syncDistributorPv } from "@/lib/product-distributor-rules";
+import { z } from "zod";
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -72,16 +69,13 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
     if (!existing) return fail(404, "Product not found");
 
     const body = await request.json();
-    const parsed = productSchema.safeParse(body);
+    const parsed = z.object({
+      featuredImage: z.string().nullable().optional(),
+      images: z.array(z.object({ url: z.string(), alt: z.string().max(200).default(""), sortOrder: z.number().int().default(0) })).default([]),
+    }).safeParse(body);
     if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
 
     const data = parsed.data;
-    const desiredSlug = data.slug?.trim() || data.name;
-    const slug = desiredSlug === existing.slug ? existing.slug : await ensureUniqueSlug(prisma.product, desiredSlug, id);
-    const sku = data.sku?.trim() || existing.sku;
-
-    const wasPublished = existing.status === "PUBLISHED";
-    const isPublished = data.status === "PUBLISHED";
 
     const product = await prisma.$transaction(async (tx) => {
       await tx.productImage.deleteMany({ where: { productId: id } });
@@ -89,72 +83,27 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
       const updated = await tx.product.update({
         where: { id },
         data: {
-          name: data.name,
-          slug,
-          sku,
-          categoryId: data.categoryId,
-          brandId: data.brandId || null,
-          shortDescription: data.shortDescription || null,
-          fullDescription: data.fullDescription,
-          costPrice: data.costPrice ?? null,
-          price: data.price,
-          compareAtPrice: data.compareAtPrice ?? null,
-          discountType: data.discountType ?? null,
-          discountValue: data.discountValue ?? null,
-          taxClass: data.taxClass || null,
-          stock: data.stock,
-          lowStockAlert: data.lowStockAlert ?? null,
-          stockStatus: data.stockStatus,
-          minimumOrderQuantity: data.minimumOrderQuantity,
-          maximumOrderQuantity: data.maximumOrderQuantity ?? null,
-          weight: data.weight ?? null,
-          length: data.length ?? null,
-          width: data.width ?? null,
-          height: data.height ?? null,
           featuredImage: data.featuredImage || null,
-          isFeatured: data.isFeatured,
-          isBestSeller: data.isBestSeller,
-          isNewArrival: data.isNewArrival,
-          isOnSale: data.isOnSale,
-          isTrending: data.isTrending,
-          isSpecial: data.isSpecial,
-          isWeekly: data.isWeekly,
-          isFlash: data.isFlash,
-          metaTitle: data.metaTitle || null,
-          metaDescription: data.metaDescription || null,
-          metaKeywords: data.metaKeywords || null,
-          warranty: data.warranty || null,
-          tags: data.tags,
-          colorway: data.colorway,
-          status: data.status,
-          publishedAt: !wasPublished && isPublished ? new Date() : existing.publishedAt,
-          hasDiscount: data.hasDiscount,
-          forCustomer: data.hasDiscount && data.forCustomer,
-          customerDiscountPercent: data.hasDiscount && data.forCustomer ? data.customerDiscountPercent : null,
-          forDistributor: data.hasDiscount && data.forDistributor,
-          hasPointValue: data.hasPointValue,
           images: {
             create: data.images.map((img, i) => ({ url: img.url, alt: img.alt, sortOrder: img.sortOrder ?? i })),
           },
         },
       });
 
-      const distributorDiscounts = data.hasDiscount && data.forDistributor ? data.distributorDiscounts : [];
-      await syncRelations(tx, id, data.relatedIds, data.crossSellIds, data.upSellIds);
-      await syncDistributorDiscounts(tx, id, distributorDiscounts);
-      await syncDistributorPv(tx, id, data.hasPointValue ? data.pvDistributorIds : [], data.price, distributorDiscounts);
       return updated;
     });
 
-    return ok(product, "Product updated");
+    return ok(product, "Product images updated");
   } catch (error) {
     return handleApiError(error);
   }
 }
 
-export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE() {
   try {
-    const admin = await requirePermission("products.delete");
+    await requirePermission("products.delete");
+    return fail(403, "Products are managed by OMS and cannot be deleted here.");
+    /*
     if (admin.dealerId != null) {
       return fail(403, "Dealers cannot delete central products");
     }
@@ -166,7 +115,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
     if (!existing) return fail(404, "Product not found");
 
     await prisma.product.update({ where: { id }, data: { deletedAt: new Date() } });
-    return ok(null, "Product moved to trash");
+    return ok(null, "Product moved to trash"); */
   } catch (error) {
     return handleApiError(error);
   }

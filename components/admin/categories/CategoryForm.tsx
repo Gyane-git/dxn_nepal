@@ -51,6 +51,7 @@ interface CategoryFormProps {
   initial: CategoryFormValues;
   onSubmit: (values: CategoryFormValues) => Promise<{ ok: boolean; message?: string }>;
   submitLabel: string;
+  mediaOnly?: boolean;
 }
 
 function descendantIds(all: ParentOption[], rootId: string): Set<string> {
@@ -64,7 +65,7 @@ function descendantIds(all: ParentOption[], rootId: string): Set<string> {
   return result;
 }
 
-export function CategoryForm({ initial, onSubmit, submitLabel }: CategoryFormProps) {
+export function CategoryForm({ initial, onSubmit, submitLabel, mediaOnly = false }: CategoryFormProps) {
   const router = useRouter();
   const [values, setValues] = useState<CategoryFormValues>(initial);
   const [parentOptions, setParentOptions] = useState<ParentOption[]>([]);
@@ -95,6 +96,26 @@ export function CategoryForm({ initial, onSubmit, submitLabel }: CategoryFormPro
       return;
     }
     router.push("/admin/categories");
+  }
+
+  if (mediaOnly) {
+    return (
+      <form onSubmit={handleSubmit} className="mx-auto max-w-xl">
+        <div className="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-sky-800">Category details are synced from OMS. Only images can be updated locally.</div>
+        <div className="mt-5 rounded-xl border border-gray-200 bg-white p-5 shadow-soft">
+          <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Media</h2>
+          <div className="mt-4 flex flex-col gap-4">
+            <ImageUpload label="Image" value={values.image} onChange={(url) => set("image", url)} folder="categories" />
+            <ImageUpload label="Banner image" value={values.bannerImage} onChange={(url) => set("bannerImage", url)} folder="categories" />
+          </div>
+        </div>
+        {error && <p className="mt-4 text-sm text-red-600">{error}</p>}
+        <div className="mt-5 flex gap-3">
+          <Button type="submit" variant="admin" isLoading={isSubmitting}>{submitLabel}</Button>
+          <Button type="button" variant="adminOutline" onClick={() => router.push("/admin/categories")}>Cancel</Button>
+        </div>
+      </form>
+    );
   }
 
   return (
