@@ -6,6 +6,7 @@ import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { OrderFilterBar, EMPTY_FILTERS, type OrderFilters } from "@/components/admin/OrderFilterBar";
 import { formatPrice, formatDate } from "@/lib/format";
+import { usePermissions } from "@/providers/PermissionsProvider";
 
 interface AdminOrderRow {
   id: string;
@@ -18,6 +19,105 @@ interface AdminOrderRow {
   total: number;
   itemCount: number;
   placedAt: string;
+  dealer: { id: number; name: string; salesCenterCode: string | null } | null;
+  omsSyncStatus: "PENDING" | "SUCCESS" | "FAILED";
+  omsSyncError: string | null;
+}
+
+interface DealerOption {
+  id: number;
+  name: string;
+  salesCenterCode: string | null;
+}
+
+function orderAge(placedAt: string) {
+  const elapsedMs = Date.now() - new Date(placedAt).getTime();
+  const days = Math.max(0, Math.floor(elapsedMs / 86_400_000));
+  return days === 0 ? "today" : `${days}d ago`;
+}
+
+function TransferOrderButton({ order, onTransferred }: { order: AdminOrderRow; onTransferred: () => void }) {
+  const { can } = usePermissions();
+  const [open, setOpen] = useState(false);
+  const [dealers, setDealers] = useState<DealerOption[]>([]);
+  const [dealerId, setDealerId] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (!can("orders.transfer") || order.status !== "PROCESSING" || order.omsSyncStatus === "SUCCESS") return <span className="text-xs text-gray-400">—</span>;
+
+  async function openTransfer() {
+    setOpen(true);
+    setError(null);
+    const res = await fetch("/api/admin/orders/dealers");
+    const json = await res.json();
+    if (!res.ok) return setError(json.message ?? "Unable to load dealers");
+    setDealers(json.data ?? []);
+  }
+
+  async function transfer() {
+    if (!dealerId) return setError("Select a dealer branch");
+    setIsSaving(true);
+    setError(null);
+    const res = await fetch(`/api/admin/orders/${order.id}/transfer`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ dealerId: Number(dealerId) }),
+    });
+    const json = await res.json();
+    setIsSaving(false);
+    if (!res.ok) return setError(json.message ?? "Transfer failed");
+    setOpen(false);
+    onTransferred();
+  }
+
+  return (
+    <>
+      <Button variant="adminOutline" size="sm" onClick={openTransfer}>Transfer</Button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/35 p-4">
+          <div className="w-full max-w-md rounded-xl bg-white p-5 shadow-xl">
+            <h2 className="text-lg font-semibold text-gray-900">Transfer order</h2>
+            <p className="mt-1 text-sm text-gray-500">Move {order.orderNumber} to another dealer. Stock is checked before the transfer.</p>
+            <select value={dealerId} onChange={(e) => setDealerId(e.target.value)} className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm">
+              <option value="">Select dealer branch</option>
+              {dealers.filter((d) => d.id !== order.dealer?.id).map((d) => <option key={d.id} value={d.id}>{d.name}{d.salesCenterCode ? ` (${d.salesCenterCode})` : ""}</option>)}
+            </select>
+            {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+            <div className="mt-5 flex justify-end gap-2">
+              <Button variant="adminOutline" size="sm" onClick={() => setOpen(false)}>Cancel</Button>
+              <Button variant="admin" size="sm" isLoading={isSaving} onClick={transfer}>Transfer order</Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+function SendOmsButton({ order, onSent }: { order: AdminOrderRow; onSent: () => void }) {
+  const { can } = usePermissions();
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState<string | null>(order.omsSyncError);
+  if (!can("orders.edit")) return <span className="text-xs text-gray-400">—</span>;
+  if (order.omsSyncStatus === "SUCCESS") return <span className="text-xs font-medium text-emerald-700">Success</span>;
+
+  async function send() {
+    setIsSending(true);
+    setError(null);
+    const res = await fetch(`/api/admin/orders/${order.id}/send-oms`, { method: "POST" });
+    const json = await res.json();
+    setIsSending(false);
+    if (!res.ok) return setError(json.message ?? "OMS send failed");
+    onSent();
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1">
+      <Button variant="adminOutline" size="sm" isLoading={isSending} onClick={send}>{order.omsSyncStatus === "FAILED" ? "Retry OMS" : "Send to OMS"}</Button>
+      {error && <p className="max-w-64 break-words text-xs leading-5 text-red-600">OMS error: {error}</p>}
+    </div>
+  );
 }
 
 export default function AdminOrdersPage() {
@@ -26,7 +126,12 @@ export default function AdminOrdersPage() {
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [isLoading, setIsLoading] = useState(true);
+  const [dealers, setDealers] = useState<DealerOption[]>([]);
   const pageSize = 20;
+
+  function loadOrders() {
+    setFilters((current) => ({ ...current }));
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -35,6 +140,7 @@ export default function AdminOrdersPage() {
       if (filters.status) params.set("status", filters.status);
       if (filters.paymentStatus) params.set("paymentStatus", filters.paymentStatus);
       if (filters.paymentMethod) params.set("paymentMethod", filters.paymentMethod);
+      if (filters.dealerId) params.set("dealerId", filters.dealerId);
       if (filters.from) params.set("from", filters.from);
       if (filters.to) params.set("to", filters.to);
       if (filters.search) params.set("search", filters.search);
@@ -53,6 +159,12 @@ export default function AdminOrdersPage() {
     return () => clearTimeout(timer);
   }, [filters, page]);
 
+  useEffect(() => {
+    fetch("/api/admin/dealers?pageSize=100")
+      .then((res) => res.json())
+      .then((json) => setDealers(json.data?.dealers ?? []));
+  }, []);
+
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   function paymentMethodLabel(method: string) {
@@ -66,6 +178,7 @@ export default function AdminOrdersPage() {
       <div className="mt-5">
         <OrderFilterBar
           filters={filters}
+          dealers={dealers}
           onChange={(f) => {
             setFilters(f);
             setPage(1);
@@ -97,9 +210,10 @@ export default function AdminOrdersPage() {
                 </div>
                 <p className="mt-1 text-sm text-gray-800">{order.fullName}</p>
                 <p className="text-xs text-gray-500">{order.email}</p>
+                <p className="mt-1 text-xs text-gray-500">Branch: {order.dealer?.name ?? "Unassigned"}</p>
                 <div className="mt-3 flex items-center justify-between text-sm">
                   <span className="text-gray-500">
-                    {formatDate(order.placedAt)} · {order.itemCount} item{order.itemCount === 1 ? "" : "s"}
+                    {formatDate(order.placedAt)} ({orderAge(order.placedAt)}) · {order.itemCount} item{order.itemCount === 1 ? "" : "s"}
                   </span>
                   <span className="font-semibold text-gray-900">{formatPrice(order.total)}</span>
                 </div>
@@ -122,6 +236,9 @@ export default function AdminOrdersPage() {
                   <th className="px-4 py-3">Items</th>
                   <th className="px-4 py-3">Total</th>
                   <th className="px-4 py-3">Payment</th>
+                  <th className="px-4 py-3">Branch</th>
+                  <th className="px-4 py-3">OMS</th>
+                  <th className="px-4 py-3">Transfer</th>
                   <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
@@ -137,13 +254,25 @@ export default function AdminOrdersPage() {
                       <p className="text-gray-900">{order.fullName}</p>
                       <p className="text-xs text-gray-500">{order.email}</p>
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{formatDate(order.placedAt)}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {formatDate(order.placedAt)} <span className="text-xs text-gray-400">({orderAge(order.placedAt)})</span>
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{order.itemCount}</td>
                     <td className="px-4 py-3 font-medium text-gray-900">{formatPrice(order.total)}</td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.paymentStatus} />{" "}
                       <span className="text-xs text-gray-500">{paymentMethodLabel(order.paymentMethod)}</span>
                     </td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {order.dealer ? (
+                        <>
+                          {order.dealer.name}
+                          {order.dealer.salesCenterCode && <span className="block text-xs text-gray-400">{order.dealer.salesCenterCode}</span>}
+                        </>
+                      ) : "Unassigned"}
+                    </td>
+                    <td className="px-4 py-3"><SendOmsButton order={order} onSent={loadOrders} /></td>
+                    <td className="px-4 py-3"><TransferOrderButton order={order} onTransferred={loadOrders} /></td>
                     <td className="px-4 py-3">
                       <StatusBadge status={order.status} />
                     </td>

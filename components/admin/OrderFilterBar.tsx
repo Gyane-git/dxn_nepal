@@ -4,6 +4,7 @@ export interface OrderFilters {
   status: string;
   paymentStatus: string;
   paymentMethod: string;
+  dealerId: string;
   from: string;
   to: string;
   search: string;
@@ -13,6 +14,7 @@ export const EMPTY_FILTERS: OrderFilters = {
   status: "",
   paymentStatus: "",
   paymentMethod: "",
+  dealerId: "",
   from: "",
   to: "",
   search: "",
@@ -21,9 +23,11 @@ export const EMPTY_FILTERS: OrderFilters = {
 export function OrderFilterBar({
   filters,
   onChange,
+  dealers = [],
 }: {
   filters: OrderFilters;
   onChange: (filters: OrderFilters) => void;
+  dealers?: { id: number; name: string; salesCenterCode?: string | null }[];
 }) {
   function set<K extends keyof OrderFilters>(key: K, value: OrderFilters[K]) {
     onChange({ ...filters, [key]: value });
@@ -67,6 +71,14 @@ export function OrderFilterBar({
         <option value="">All payment methods</option>
         <option value="COD">COD</option>
         <option value="ONLINE">eSewa</option>
+      </select>
+      <select value={filters.dealerId} onChange={(e) => set("dealerId", e.target.value)} className={inputClass}>
+        <option value="">All branches</option>
+        {dealers.map((dealer) => (
+          <option key={dealer.id} value={dealer.id}>
+            {dealer.name}{dealer.salesCenterCode ? ` (${dealer.salesCenterCode})` : ""}
+          </option>
+        ))}
       </select>
       <div className="flex gap-2">
         <input type="date" value={filters.from} onChange={(e) => set("from", e.target.value)} className={inputClass} />

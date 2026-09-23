@@ -5,6 +5,29 @@ import { parsePagination } from "@/lib/admin-query";
 import { z } from "zod";
 
 /**
+ * Every dealer starts with the complete published OMS catalog. A row is created only when it is
+ * missing, so later dealer-specific stock edits are never overwritten by viewing this page.
+ */
+async function ensureDefaultDealerInventory(dealerId: number) {
+  const products = await prisma.product.findMany({
+    where: { status: "PUBLISHED", deletedAt: null },
+    select: { id: true, stock: true },
+  });
+  if (products.length === 0) return;
+
+  await prisma.dealerInventory.createMany({
+    data: products.map((product) => ({
+      dealerId,
+      productId: product.id,
+      variantId: null,
+      stock: product.stock,
+      status: "ACTIVE",
+    })),
+    skipDuplicates: true,
+  });
+}
+
+/**
  * Lists published products alongside this dealer's current stock for each (0 when no row exists
  * yet). A login linked to this exact dealer (self-service) sees only its own already-assigned
  * products — never the full catalog, never another dealer's. Admin staff with `dealers.view` see
@@ -29,6 +52,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const dealer = await prisma.dealer.findUnique({ where: { id: dealerId } });
     if (!dealer) return fail(404, "Dealer not found");
+    await ensureDefaultDealerInventory(dealerId);
 
     const { searchParams } = new URL(request.url);
     const search = searchParams.get("search")?.trim();
@@ -163,7 +187,7 @@ const toggleAssignmentSchema = z.object({
 });
 
 /**
- * Assigns (creates the row, stock starts at 0) or deactivates ("unassigns") a product for this
+ * Assigns (creates the row with its current global stock) or deactivates ("unassigns") a product for this
  * dealer — the deactivated row's stock is preserved so reassigning later restores it. A dealer
  * can never assign/unassign products to itself, regardless of permissions — only real admin
  * staff (not linked to any dealer) or the Super Admin may call this.
@@ -198,7 +222,7 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const row = existing
       ? await prisma.dealerInventory.update({ where: { id: existing.id }, data: { status } })
       : await prisma.dealerInventory.create({
-          data: { dealerId, productId: data.productId, variantId, status, stock: 0 },
+          data: { dealerId, productId: data.productId, variantId, status, stock: product.stock },
         });
 
     return ok(row, data.assigned ? "Product assigned" : "Product unassigned");

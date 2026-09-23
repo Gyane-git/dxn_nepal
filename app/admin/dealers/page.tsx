@@ -105,9 +105,9 @@ export default function AdminDealersPage() {
                 <thead className="border-b border-gray-100 bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                   <tr>
                     <th className="px-4 py-3">Dealer</th>
-                    <th className="px-4 py-3">Linked Distributor</th>
+                    {/* <th className="px-4 py-3">Linked Distributor</th> */}
                     <th className="px-4 py-3">Cities</th>
-                    <th className="px-4 py-3">Shipping</th>
+                    {/* <th className="px-4 py-3">Shipping</th> */}
                     <th className="px-4 py-3">Status</th>
                     <th className="px-4 py-3"></th>
                   </tr>
@@ -121,7 +121,7 @@ export default function AdminDealersPage() {
                         </Link>
                         <div className="text-xs text-gray-400">{d.salesCenterCode ?? d.phone ?? "—"}</div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">
+                      {/* <td className="px-4 py-3 text-gray-600">
                         {d.user ? (
                           <>
                             {d.user.name}
@@ -130,9 +130,9 @@ export default function AdminDealersPage() {
                         ) : (
                           <span className="text-xs text-gray-400">Standalone</span>
                         )}
-                      </td>
+                      </td> */}
                       <td className="px-4 py-3 text-gray-500">{d._count.wardAssignments}</td>
-                      <td className="px-4 py-3 text-gray-500">Rs {Number(d.shippingCharge).toLocaleString()}</td>
+                      {/* <td className="px-4 py-3 text-gray-500">Rs {Number(d.shippingCharge).toLocaleString()}</td> */}
                       <td className="px-4 py-3"><StatusBadge status={d.status} /></td>
                       <td className="px-4 py-3 text-right">
                         <Link href={`/admin/dealers/${d.id}`} className="font-medium text-slate-600 hover:text-slate-800">

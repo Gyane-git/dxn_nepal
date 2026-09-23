@@ -28,6 +28,7 @@ type OmsSalesCenter = {
 
 const DEFAULT_TOKEN_URL = "http://nbewebapi.globaltechsolution.com.np:802/token";
 const DEFAULT_RESET_URL = "http://nbewebapi.globaltechsolution.com.np:802/api/v1/full-reset";
+const DEFAULT_ORDER_URL = "http://nbewebapi.globaltechsolution.com.np:802/api/v1/placeEcomOrder";
 const OMS_CATEGORY_MARKER = "oms:";
 
 function numberValue(value: number | string | null | undefined) {
@@ -37,6 +38,11 @@ function numberValue(value: number | string | null | undefined) {
 
 function stockValue(product: OmsProduct) {
   return Math.max(0, Math.floor(numberValue(product.availableQty ?? product.stockQuantity)));
+}
+
+/** OMS accepts monetary values as decimal strings. Avoid JS floating-point tails in the payload. */
+function omsAmount(value: number) {
+  return (Number.isFinite(value) ? value : 0).toFixed(2);
 }
 
 async function fetchOmsAccessToken() {
@@ -97,6 +103,10 @@ export async function fetchOmsSalesCenters(): Promise<OmsSalesCenter[]> {
 /** Upserts OMS sales centers without touching locally managed inventory, cities, or shipping rules. */
 export async function syncOmsSalesCenters() {
   const centers = await fetchOmsSalesCenters();
+  const catalog = await prisma.product.findMany({
+    where: { status: "PUBLISHED", deletedAt: null },
+    select: { id: true, stock: true },
+  });
   let createdDealers = 0;
   let updatedDealers = 0;
   let skippedDealers = 0;
@@ -121,15 +131,130 @@ export async function syncOmsSalesCenters() {
     const existing = await prisma.dealer.findFirst({
       where: { OR: [{ salesCenterCode }, { name }] },
     });
+    const dealer = existing
+      ? await prisma.dealer.update({ where: { id: existing.id }, data })
+      : await prisma.dealer.create({ data });
     if (existing) {
-      await prisma.dealer.update({ where: { id: existing.id }, data });
       updatedDealers++;
     } else {
-      await prisma.dealer.create({ data });
       createdDealers++;
+    }
+    // All OMS products are assigned on first sync. createMany only adds missing rows, so a
+    // dealer's manually edited stock is retained on later OMS dealer syncs.
+    if (catalog.length > 0) {
+      await prisma.dealerInventory.createMany({
+        data: catalog.map((product) => ({
+          dealerId: dealer.id,
+          productId: product.id,
+          variantId: null,
+          stock: product.stock,
+          status: "ACTIVE",
+        })),
+        skipDuplicates: true,
+      });
     }
   }
   return { receivedDealers: centers.length, createdDealers, updatedDealers, skippedDealers };
+}
+
+/**
+ * Sends a locally committed order to OMS. The local order is never rolled back when OMS is
+ * temporarily unavailable; payment/order integrity remains authoritative in this application.
+ */
+export async function postOrderToOms(orderId: number) {
+  const order = await prisma.order.findUnique({
+    where: { id: orderId },
+    include: {
+      dealer: { select: { salesCenterCode: true } },
+      user: { select: { name: true, distributorId: true, phone: true } },
+      items: { include: { product: { select: { sku: true, price: true } } } },
+    },
+  });
+  if (!order) throw new Error("Order not found");
+  const salesCenter = order.dealer?.salesCenterCode;
+  if (!salesCenter) throw new Error("No OMS sales center is assigned to this order");
+  if (order.items.some((item) => !item.product.sku)) throw new Error("One or more order items do not have an OMS SKU");
+
+  // OMS returns only a generic 500 for an unknown SKU. Validate first so staff receive an
+  // actionable error and never believe an unsupported legacy/local product was dispatched.
+  const omsSkus = new Set((await fetchOmsCatalog()).map((product) => product.sku?.trim()).filter(Boolean));
+  const unknownSku = order.items.find((item) => !omsSkus.has(item.product.sku!.trim()));
+  if (unknownSku) throw new Error(`${unknownSku.product.sku} is not available in the OMS catalog. Sync products or use an OMS product before sending this order.`);
+
+  const token = await fetchOmsAccessToken();
+  const omsDate = (date: Date) => date.toISOString().slice(0, 19);
+  const payload = {
+    storeCode: process.env.OMS_STORE_CODE || "DXNECOME01",
+    // OMS's placeEcomOrder stored procedure expects a numeric order number (as in its sample
+    // payload). The storefront's display number can be alphanumeric, so use the stable local id.
+    orderNumber: String(order.id),
+    SalesCenter: salesCenter,
+    orderId: String(order.id),
+    Updated: omsDate(order.updatedAt),
+    // Keep this simple ASCII text: some OMS installations reject Unicode/punctuation in remarks.
+    remarks: `Ecommerce order ${order.id}`,
+    membercode: order.user.distributorId ?? "",
+    // A normal ecommerce account is not an OMS member. A fabricated member/user code can make
+    // the OMS stored procedure fail with its otherwise unhelpful generic 500 response.
+    membername: order.user.distributorId ? order.user.name : "",
+    membermobile: order.phone || order.user.phone || "",
+    // COD is collected on delivery, so OMS receives zero as in its provided sample.
+    PaymentAmount: order.paymentStatus === "PAID" ? omsAmount(Number(order.total)) : "0",
+    CustomerName: order.fullName,
+    Cashbankname: process.env.OMS_CASH_BANK_NAME || "10",
+    Order: order.items.map((item) => {
+      const unitPrice = Number(item.price);
+      const catalogPrice = Number(item.product.price);
+      const quantity = item.quantity;
+      const discountAmount = Math.max(0, catalogPrice - unitPrice) * quantity;
+      return {
+        sku: item.product.sku!,
+        quantity: String(quantity),
+        unitPrice: omsAmount(unitPrice),
+        finalPrice: omsAmount(unitPrice * quantity),
+        remarks: "",
+        DiscountAmount: omsAmount(discountAmount),
+        Discountrate: String(item.discountPercent ?? 0),
+        DispatchAmount: "0",
+      };
+    }),
+    userDetails: {
+      userName: order.user.distributorId ? order.user.name : "",
+      userCode: order.user.distributorId ?? "",
+      phone: order.phone || order.user.phone || "",
+      deliveryTime: omsDate(order.placedAt),
+    },
+  };
+  // Diagnostics deliberately exclude token, phone, address, and customer details.
+  console.info("[oms] sending order", {
+    orderId: order.id,
+    orderNumber: payload.orderNumber,
+    salesCenter: payload.SalesCenter,
+    paymentAmount: payload.PaymentAmount,
+    items: payload.Order.map((item) => ({ sku: item.sku, quantity: item.quantity, unitPrice: item.unitPrice, finalPrice: item.finalPrice })),
+  });
+  const response = await fetch(process.env.OMS_ORDER_URL || DEFAULT_ORDER_URL, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(payload),
+    cache: "no-store",
+    signal: AbortSignal.timeout(30_000),
+  });
+  const rawResponse = await response.text();
+  let responseBody: { status?: unknown; message?: unknown } | null = null;
+  try {
+    responseBody = rawResponse ? JSON.parse(rawResponse) as { status?: unknown; message?: unknown } : null;
+  } catch {
+    // Some OMS failures are plain text or HTML; retain a short safe excerpt below.
+  }
+  if (!response.ok) {
+    const detail = typeof responseBody?.message === "string" ? responseBody.message : rawResponse.trim().slice(0, 500);
+    throw new Error(detail ? `OMS order request failed (${response.status}): ${detail}` : `OMS order request failed (${response.status}).`);
+  }
+  if (typeof responseBody?.status === "string" && responseBody.status.toLowerCase() !== "success") {
+    throw new Error(typeof responseBody.message === "string" ? responseBody.message : "OMS did not accept the order");
+  }
+  await prisma.order.update({ where: { id: orderId }, data: { omsSyncStatus: "SUCCESS", omsSyncError: null, omsSyncedAt: new Date() } });
 }
 
 /** Upserts OMS categories and products. Product images remain local and are never overwritten. */

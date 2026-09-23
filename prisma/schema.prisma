@@ -783,6 +783,10 @@ model Order {
   dealerId         Int?
   dealerName       String?
   dealerPhone      String?
+  /// OMS dispatch is an explicit admin action, never performed during checkout.
+  omsSyncStatus    OmsOrderSyncStatus   @default(PENDING)
+  omsSyncError     String?              @db.Text
+  omsSyncedAt      DateTime?
   wardId           Int?
   coupon           Coupon?              @relation(fields: [couponId], references: [id], map: "Order_couponId_fkey")
   user             User                 @relation(fields: [userId], references: [id], map: "Order_userId_fkey")
@@ -797,6 +801,12 @@ model Order {
   @@index([status], map: "Order_status_idx")
   @@index([userId], map: "Order_userId_idx")
   @@map("order")
+}
+
+enum OmsOrderSyncStatus {
+  PENDING
+  SUCCESS
+  FAILED
 }
 
 model OrderItem {

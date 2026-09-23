@@ -84,6 +84,7 @@ const MODULES: ModuleDef[] = [
     actions: [
       { action: "view", label: "View Orders" },
       { action: "edit", label: "Edit/Update Order" },
+      { action: "transfer", label: "Transfer Pending Orders Between Dealers" },
       { action: "cancel", label: "Cancel Order" },
       { action: "export", label: "Export Orders" },
     ],
@@ -177,4 +178,4 @@ export const ALL_PERMISSION_KEYS: string[] = PERMISSIONS.map((p) => p.key);
  * whose Dealer.adminRoleId is null — deliberately a subset of ALL_PERMISSION_KEYS, since an
  * unrestricted dealer should never be shown admin-only keys like `roles.delete`.
  */
-export const DEALER_PORTAL_PERMISSION_KEYS: string[] = ["dashboard.view", "products.view", "dealer_inventory.view", "dealer_inventory.update", "orders.view", "orders.edit"];
+export const DEALER_PORTAL_PERMISSION_KEYS: string[] = ["dashboard.view", "products.view", "dealer_inventory.view", "dealer_inventory.update", "orders.view", "orders.edit", "orders.transfer"];

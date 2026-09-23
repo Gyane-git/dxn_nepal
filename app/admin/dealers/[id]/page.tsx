@@ -407,7 +407,7 @@ function InventoryTab({ dealerId, canAssign }: { dealerId: number; canAssign: bo
       </div>
       <p className="mt-2 text-xs text-gray-500">
         {canAssign
-          ? "Check “Assigned” to authorize this dealer to sell a product — only assigned products are visible in the dealer's own portal."
+          ? "All OMS products are assigned by default and start with the current global stock. Any saved dealer-stock edit is kept separately."
           : "Update how many units you currently have available for each product. Contact an administrator to get more products assigned to you."}
       </p>
       <table className="mt-4 w-full text-left text-sm">

@@ -15,6 +15,8 @@ export async function GET(request: Request) {
     const status = searchParams.get("status");
     const paymentStatus = searchParams.get("paymentStatus");
     const paymentMethod = searchParams.get("paymentMethod");
+    const dealerIdParam = searchParams.get("dealerId");
+    const dealerId = dealerIdParam && Number.isInteger(Number(dealerIdParam)) ? Number(dealerIdParam) : null;
     const from = searchParams.get("from");
     const to = searchParams.get("to");
     const search = searchParams.get("search")?.trim();
@@ -26,7 +28,7 @@ export async function GET(request: Request) {
     const scopedDealerId = !admin.isSuperAdmin ? admin.dealerId : null;
 
     const where: Prisma.OrderWhereInput = {
-      ...(scopedDealerId != null ? { dealerId: scopedDealerId } : {}),
+      ...(scopedDealerId != null ? { dealerId: scopedDealerId } : dealerId != null ? { dealerId } : {}),
       ...(status && VALID_STATUSES.includes(status as OrderStatus) ? { status: status as OrderStatus } : {}),
       ...(paymentStatus && VALID_PAYMENT_STATUSES.includes(paymentStatus as PaymentStatus)
         ? { paymentStatus: paymentStatus as PaymentStatus }
@@ -59,13 +61,16 @@ export async function GET(request: Request) {
         orderBy: { placedAt: "desc" },
         skip: (page - 1) * pageSize,
         take: pageSize,
-        include: { items: true },
+        include: { items: true, dealer: { select: { id: true, name: true, salesCenterCode: true } } },
       }),
       prisma.order.count({ where }),
     ]);
 
-    const data = orders.map(({ items, ...order }) => ({
+    const data = orders.map(({ items, dealer, ...order }) => ({
       ...order,
+      dealer,
+      omsSyncStatus: order.omsSyncStatus,
+      omsSyncError: order.omsSyncError,
       subtotal: Number(order.subtotal),
       discount: Number(order.discount),
       total: Number(order.total),
