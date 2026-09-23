@@ -272,6 +272,8 @@ model WardDistance {
 /// an existing Distributor, not a separate signup. Most Distributors are never Dealers.
 model Dealer {
   id              Int                    @id @default(autoincrement())
+  /// Stable OMS sales-center identity. Dealers are synchronized from OMS.
+  salesCenterCode String?                @unique
   /// Optional — a Dealer may stand alone (no login/portal access) or be backed by an approved
   /// Distributor account (grants that account dealer-portal access to view/ship their orders).
   userId          Int?                   @unique
@@ -279,6 +281,8 @@ model Dealer {
   phone           String?
   email           String?
   address         String?
+  country         String?
+  contactPerson   String?
   shippingCharge  Decimal                @default(0.00) @db.Decimal(10, 2)
   status          EntityStatus           @default(ACTIVE)
   createdAt       DateTime               @default(now())

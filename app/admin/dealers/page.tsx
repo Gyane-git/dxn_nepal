@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { RefreshCw } from "lucide-react";
 import { StatusBadge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { SearchInput } from "@/components/admin/SearchInput";
@@ -11,6 +12,7 @@ import { usePermissions } from "@/providers/PermissionsProvider";
 interface DealerRow {
   id: number;
   name: string;
+  salesCenterCode: string | null;
   phone: string | null;
   status: "ACTIVE" | "INACTIVE";
   shippingCharge: string;
@@ -28,6 +30,8 @@ export default function AdminDealersPage() {
   const [rows, setRows] = useState<DealerRow[]>([]);
   const [total, setTotal] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   const load = useCallback(() => {
     setIsLoading(true);
@@ -52,6 +56,18 @@ export default function AdminDealersPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
+  async function syncDealers() {
+    setIsSyncing(true);
+    setSyncMessage(null);
+    const res = await fetch("/api/admin/oms/sales-centers/sync", { method: "POST" });
+    const json = await res.json();
+    setIsSyncing(false);
+    if (!res.ok) return setSyncMessage(json.message ?? "OMS dealer sync failed.");
+    const data = json.data;
+    setSyncMessage(`OMS synced: ${data.createdDealers} added and ${data.updatedDealers} updated.`);
+    load();
+  }
+
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -59,12 +75,10 @@ export default function AdminDealersPage() {
           <h1 className="text-2xl font-bold tracking-tight text-gray-900">Dealers</h1>
           <p className="mt-1 text-sm text-gray-500">Fulfillment points serving one or more cities.</p>
         </div>
-        {ownDealerId == null && (
-          <Link href="/admin/dealers/new">
-            <Button variant="admin" size="sm">New Dealer</Button>
-          </Link>
-        )}
+        {ownDealerId == null && <Button variant="admin" size="sm" onClick={syncDealers} isLoading={isSyncing}><RefreshCw size={15} /> Sync Dealers</Button>}
       </div>
+
+      {syncMessage && <p className="mt-3 text-sm text-gray-600">{syncMessage}</p>}
 
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <SearchInput value={search} onChange={(v) => { setSearch(v); setPage(1); }} placeholder="Search dealers..." className="w-full sm:w-64" />
@@ -105,7 +119,7 @@ export default function AdminDealersPage() {
                         <Link href={`/admin/dealers/${d.id}`} className="font-medium text-gray-900 hover:text-slate-600">
                           {d.name}
                         </Link>
-                        <div className="text-xs text-gray-400">{d.phone ?? "—"}</div>
+                        <div className="text-xs text-gray-400">{d.salesCenterCode ?? d.phone ?? "—"}</div>
                       </td>
                       <td className="px-4 py-3 text-gray-600">
                         {d.user ? (
@@ -135,7 +149,7 @@ export default function AdminDealersPage() {
                 <li key={d.id} className="flex items-center justify-between gap-3 px-4 py-3">
                   <div>
                     <Link href={`/admin/dealers/${d.id}`} className="text-sm font-medium text-gray-900">{d.name}</Link>
-                    <p className="text-xs text-gray-400">{d.user?.distributorId ?? "Standalone"} · {d._count.wardAssignments} cities</p>
+                    <p className="text-xs text-gray-400">{d.salesCenterCode ?? d.user?.distributorId ?? "Standalone"} · {d._count.wardAssignments} cities</p>
                   </div>
                   <StatusBadge status={d.status} />
                 </li>

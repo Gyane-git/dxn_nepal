@@ -16,6 +16,16 @@ type OmsProduct = {
 
 type OmsResponse = { data?: OmsProduct[]; message?: string };
 
+type OmsSalesCenter = {
+  SalesCenterCode?: string | null;
+  SalesCenterName?: string | null;
+  Country?: string | null;
+  Address?: string | null;
+  Telphone?: string | null;
+  Mobile?: string | null;
+  ContactPerson?: string | null;
+};
+
 const DEFAULT_TOKEN_URL = "http://nbewebapi.globaltechsolution.com.np:802/token";
 const DEFAULT_RESET_URL = "http://nbewebapi.globaltechsolution.com.np:802/api/v1/full-reset";
 const OMS_CATEGORY_MARKER = "oms:";
@@ -29,8 +39,7 @@ function stockValue(product: OmsProduct) {
   return Math.max(0, Math.floor(numberValue(product.availableQty ?? product.stockQuantity)));
 }
 
-/** Fetch the complete current catalog from OMS. Credentials only ever live in server env vars. */
-export async function fetchOmsCatalog(): Promise<OmsProduct[]> {
+async function fetchOmsAccessToken() {
   const username = process.env.OMS_USERNAME;
   const password = process.env.OMS_PASSWORD;
   if (!username || !password) {
@@ -50,6 +59,12 @@ export async function fetchOmsCatalog(): Promise<OmsProduct[]> {
   const token = tokenBody.access_token ?? tokenBody.token;
   if (!token) throw new Error("OMS token response did not include an access token.");
 
+  return token;
+}
+
+/** Fetch the complete current catalog from OMS. Credentials only ever live in server env vars. */
+export async function fetchOmsCatalog(): Promise<OmsProduct[]> {
+  const token = await fetchOmsAccessToken();
   const resetUrl = new URL(process.env.OMS_RESET_URL || DEFAULT_RESET_URL);
   resetUrl.searchParams.set("Storecode", process.env.OMS_STORE_CODE || "DXNECOME01");
   const catalogResponse = await fetch(resetUrl, {
@@ -58,10 +73,63 @@ export async function fetchOmsCatalog(): Promise<OmsProduct[]> {
     signal: AbortSignal.timeout(60_000),
   });
   if (!catalogResponse.ok) throw new Error(`OMS catalog request failed (${catalogResponse.status}).`);
-
   const payload = (await catalogResponse.json()) as OmsResponse;
   if (!Array.isArray(payload.data)) throw new Error("OMS catalog response did not contain product data.");
   return payload.data;
+}
+
+/** Fetch sales centers from OMS. These are read-only master records in this app. */
+export async function fetchOmsSalesCenters(): Promise<OmsSalesCenter[]> {
+  const token = await fetchOmsAccessToken();
+  const url = new URL("http://nbewebapi.globaltechsolution.com.np:802/api/v1/full-salescenter");
+  url.searchParams.set("storeCode", process.env.OMS_STORE_CODE || "DXNECOME01");
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    cache: "no-store",
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!response.ok) throw new Error(`OMS sales-center request failed (${response.status}).`);
+  const payload = (await response.json()) as { data?: OmsSalesCenter[] };
+  if (!Array.isArray(payload.data)) throw new Error("OMS sales-center response did not contain dealer data.");
+  return payload.data;
+}
+
+/** Upserts OMS sales centers without touching locally managed inventory, cities, or shipping rules. */
+export async function syncOmsSalesCenters() {
+  const centers = await fetchOmsSalesCenters();
+  let createdDealers = 0;
+  let updatedDealers = 0;
+  let skippedDealers = 0;
+
+  for (const center of centers) {
+    const salesCenterCode = center.SalesCenterCode?.trim();
+    const name = center.SalesCenterName?.trim();
+    if (!salesCenterCode || !name) {
+      skippedDealers++;
+      continue;
+    }
+    const phone = center.Mobile?.trim() || center.Telphone?.trim() || null;
+    const data = {
+      salesCenterCode,
+      name,
+      country: center.Country?.trim() || null,
+      address: center.Address?.trim() || null,
+      phone,
+      contactPerson: center.ContactPerson?.trim() || null,
+      status: "ACTIVE" as const,
+    };
+    const existing = await prisma.dealer.findFirst({
+      where: { OR: [{ salesCenterCode }, { name }] },
+    });
+    if (existing) {
+      await prisma.dealer.update({ where: { id: existing.id }, data });
+      updatedDealers++;
+    } else {
+      await prisma.dealer.create({ data });
+      createdDealers++;
+    }
+  }
+  return { receivedDealers: centers.length, createdDealers, updatedDealers, skippedDealers };
 }
 
 /** Upserts OMS categories and products. Product images remain local and are never overwritten. */

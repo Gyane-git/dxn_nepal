@@ -17,9 +17,12 @@ const CITYWIDE_WARD_NO = 0;
 interface DealerDetail {
   id: number;
   name: string;
+  salesCenterCode: string | null;
   phone: string | null;
   email: string | null;
   address: string | null;
+  country: string | null;
+  contactPerson: string | null;
   shippingCharge: string;
   status: "ACTIVE" | "INACTIVE";
   user: { id: number; name: string; email: string; distributorId: string | null } | null;
@@ -62,12 +65,10 @@ export default function AdminDealerDetailPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    if (isSelfService) setTab("inventory");
-  }, [isSelfService]);
-
   if (notFound) return <p className="text-sm text-gray-500">Dealer not found.</p>;
   if (!dealer) return <p className="text-sm text-gray-500">Loading...</p>;
+
+  const activeTab: Tab = isSelfService ? "inventory" : tab;
 
   const TABS: { key: Tab; label: string }[] = isSelfService
     ? [{ key: "inventory", label: `Inventory (${dealer._count.inventory})` }]
@@ -102,7 +103,7 @@ export default function AdminDealerDetailPage() {
             type="button"
             onClick={() => setTab(t.key)}
             className={`shrink-0 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-              tab === t.key ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"
+              activeTab === t.key ? "bg-slate-800 text-white" : "text-gray-600 hover:bg-gray-100"
             }`}
           >
             {t.label}
@@ -111,55 +112,35 @@ export default function AdminDealerDetailPage() {
       </div>
 
       <div className="mt-4">
-        {tab === "details" && <DetailsTab dealer={dealer} onSaved={load} />}
-        {tab === "cities" && <CitiesTab dealer={dealer} onChanged={load} />}
-        {tab === "shipping" && <ShippingTab dealer={dealer} onChanged={load} />}
-        {tab === "inventory" && <InventoryTab dealerId={dealer.id} canAssign={!isSelfService} />}
+        {activeTab === "details" && <DetailsTab dealer={dealer} />}
+        {activeTab === "cities" && <CitiesTab dealer={dealer} onChanged={load} />}
+        {activeTab === "shipping" && <ShippingTab dealer={dealer} onChanged={load} />}
+        {activeTab === "inventory" && <InventoryTab dealerId={dealer.id} canAssign={!isSelfService} />}
       </div>
     </div>
   );
 }
 
-function DetailsTab({ dealer, onSaved }: { dealer: DealerDetail; onSaved: () => void }) {
-  const [name, setName] = useState(dealer.name);
-  const [phone, setPhone] = useState(dealer.phone ?? "");
-  const [email, setEmail] = useState(dealer.email ?? "");
-  const [address, setAddress] = useState(dealer.address ?? "");
-  const [shippingCharge, setShippingCharge] = useState(String(dealer.shippingCharge));
-  const [status, setStatus] = useState(dealer.status);
-  const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function save() {
-    setIsSaving(true);
-    setError(null);
-    const res = await fetch(`/api/admin/dealers/${dealer.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name, phone, email, address, shippingCharge: Number(shippingCharge) || 0, status }),
-    });
-    const json = await res.json();
-    setIsSaving(false);
-    if (!res.ok) {
-      setError(json.message ?? "Failed to save");
-      return;
-    }
-    onSaved();
-  }
-
+function DetailsTab({ dealer }: { dealer: DealerDetail }) {
+  const details = [
+    ["Sales center code", dealer.salesCenterCode],
+    ["Sales center name", dealer.name],
+    ["Country", dealer.country],
+    ["Address", dealer.address],
+    ["Telephone / mobile", dealer.phone],
+    ["Contact person", dealer.contactPerson],
+  ];
   return (
-    <div className="flex flex-col gap-4 rounded-xl border border-gray-200 bg-white p-5 shadow-soft sm:max-w-lg">
-      <Input label="Dealer name" value={name} onChange={(e) => setName(e.target.value)} />
-      <Input label="Phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
-      <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Input label="Address" value={address} onChange={(e) => setAddress(e.target.value)} />
-      <Input label="Default shipping charge (Rs)" type="number" min={0} value={shippingCharge} onChange={(e) => setShippingCharge(e.target.value)} />
-      <Select label="Status" value={status} onChange={(e) => setStatus(e.target.value as "ACTIVE" | "INACTIVE")}>
-        <option value="ACTIVE">Active</option>
-        <option value="INACTIVE">Inactive</option>
-      </Select>
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      <Button variant="admin" isLoading={isSaving} onClick={save} className="w-fit">Save Changes</Button>
+    <div className="rounded-xl border border-gray-200 bg-white p-5 shadow-soft sm:max-w-xl">
+      <p className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800">This sales-center data is synced from OMS and cannot be edited here.</p>
+      <dl className="mt-5 divide-y divide-gray-100">
+        {details.map(([label, value]) => (
+          <div key={label} className="grid grid-cols-1 gap-1 py-3 sm:grid-cols-3 sm:gap-4">
+            <dt className="text-sm font-medium text-gray-500">{label}</dt>
+            <dd className="text-sm text-gray-900 sm:col-span-2">{value || "—"}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

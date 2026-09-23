@@ -22,6 +22,7 @@ export function AccountProfileCard({ initial, orderCount, totalSpent }: Props) {
   const [name, setName] = useState(initial.name);
   const [phone, setPhone] = useState(initial.phone ?? "");
   const [image, setImage] = useState<string | null>(initial.image);
+  const [distributorCode, setDistributorCode] = useState(initial.distributorCode ?? "");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,6 +30,7 @@ export function AccountProfileCard({ initial, orderCount, totalSpent }: Props) {
     setName(initial.name);
     setPhone(initial.phone ?? "");
     setImage(initial.image);
+
     setError(null);
     setIsEditing(false);
   }
@@ -75,6 +77,15 @@ export function AccountProfileCard({ initial, orderCount, totalSpent }: Props) {
               <p className="truncate text-sm text-white/80">{initial.email}</p>
               <p className="mt-1 text-xs text-white/70">Member since {formatDate(initial.createdAt)}</p>
             </div>
+
+
+
+         
+
+
+ 
+
+
           </div>
           {!isEditing && (
             <button
@@ -141,6 +152,10 @@ export function AccountProfileCard({ initial, orderCount, totalSpent }: Props) {
                 <div className="flex justify-between">
                   <dt className="text-gray-500">Phone</dt>
                   <dd className="font-medium text-gray-900">{phone || "—"}</dd>
+                </div>
+                <div className="flex justify-between">
+                  <dt className="text-gray-500">Distributor No.</dt>
+                  <dd className="font-medium text-gray-900">{distributorCode || "pending"}</dd>
                 </div>
               </dl>
             </>

@@ -2,18 +2,6 @@ import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/session";
 import { ok, fail, handleApiError } from "@/lib/api";
 import { parsePagination } from "@/lib/admin-query";
-import { recordAudit } from "@/lib/audit";
-import { z } from "zod";
-
-const createDealerSchema = z.object({
-  /** Optional — a Dealer can stand alone or be backed by an approved Distributor account (see lib/session.ts requireDealer). */
-  userId: z.number().int().positive().optional(),
-  name: z.string().min(2).max(150),
-  phone: z.string().max(20).optional().or(z.literal("")),
-  email: z.string().email().max(150).optional().or(z.literal("")),
-  address: z.string().max(300).optional().or(z.literal("")),
-  shippingCharge: z.number().min(0).max(1_000_000).default(0),
-});
 
 export async function GET(request: Request) {
   try {
@@ -66,43 +54,10 @@ export async function GET(request: Request) {
 }
 
 /** A Dealer is normally standalone; passing `userId` optionally backs it with an approved Distributor account instead (grants that account dealer-portal access) — never a duplicate identity. */
-export async function POST(request: Request) {
+export async function POST() {
   try {
-    const admin = await requirePermission("dealers.create");
-    const body = await request.json();
-    const parsed = createDealerSchema.safeParse(body);
-    if (!parsed.success) return fail(400, parsed.error.issues[0]?.message ?? "Invalid request");
-    const data = parsed.data;
-
-    if (data.userId) {
-      const user = await prisma.user.findUnique({ where: { id: data.userId } });
-      if (!user) return fail(404, "User not found");
-      if (user.role !== "DISTRIBUTOR") return fail(400, "Only an approved distributor can be made a dealer");
-
-      const existing = await prisma.dealer.findUnique({ where: { userId: data.userId } });
-      if (existing) return fail(409, "This distributor is already a dealer");
-    }
-
-    const dealer = await prisma.dealer.create({
-      data: {
-        userId: data.userId ?? null,
-        name: data.name,
-        phone: data.phone || null,
-        email: data.email || null,
-        address: data.address || null,
-        shippingCharge: data.shippingCharge,
-      },
-    });
-
-    await recordAudit({
-      actorId: admin.id,
-      action: "dealer.create",
-      entityType: "Dealer",
-      entityId: dealer.id,
-      newValue: { userId: data.userId ?? null, name: data.name },
-    });
-
-    return ok(dealer, "Dealer created");
+    await requirePermission("dealers.create");
+    return fail(403, "Dealers are managed by OMS. Use Sync Dealers from the dealer list.");
   } catch (error) {
     return handleApiError(error);
   }
